@@ -2,16 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/AndroidStudioProjects/Article" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/AndroidStudioProjects/BudgetTracker" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/AndroidStudioProjects/GestureFlow" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/AndroidStudioProjects/GestureFlowTouchlessMediaController" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/AndroidStudioProjects/HandyHood" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/AndroidStudioProjects/HandyHoodoldversion" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/AndroidStudioProjects/InventoryManager" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/AndroidStudioProjects/VaidIQ" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/Downloads/Sarcasm-Detection-NLP" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/Downloads/phishing-detector" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/Downloads/phishing-detector/phishing-detector" vcs="Git" />
   </component>
 </project>

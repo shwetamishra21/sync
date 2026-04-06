@@ -43,7 +43,6 @@ git clone https://github.com/YOUR_USERNAME/Sarcasm-Detection-NLP
 cd Sarcasm-Detection-NLP
 pip install -r requirements.txt
 ```
-
 ## Branch Strategy
 - `main` — protected, merge via PR only
 - `feature/member1-tfidf` — M1 TF-IDF work
