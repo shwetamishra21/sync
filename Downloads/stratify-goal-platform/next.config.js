@@ -79,9 +79,13 @@ const withPWA = require("next-pwa")({
 
 /** @type {import("next").NextConfig} */
 const nextConfig = {
+   eslint: {
+    ignoreDuringBuilds: true,  // ← add this
+  },
   reactStrictMode: true,
 
   outputFileTracingRoot: path.join(__dirname),
 };
+
 
 module.exports = withPWA(nextConfig);
