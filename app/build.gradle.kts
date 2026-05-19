@@ -42,6 +42,16 @@ android {
 }
 
 dependencies {
+    // Lifecycle
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+
+// Activity
+    implementation("androidx.activity:activity-ktx:1.8.2")
+    // DataStore Preferences
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+
+// Fragment
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
@@ -90,4 +100,7 @@ dependencies {
 
 // Logging Interceptor
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    // Navigation
+    implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
+    implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
 }
