@@ -71,4 +71,11 @@ object NetworkModule {
 
         return retrofit.create(AuthApi::class.java)
     }
+    @Provides
+    @Singleton
+    fun provideForgotPasswordApi(
+        retrofit: Retrofit
+    ): ForgotPasswordApi {
+        return retrofit.create(ForgotPasswordApi::class.java)
+    }
 }

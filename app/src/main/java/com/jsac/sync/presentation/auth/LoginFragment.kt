@@ -9,6 +9,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.jsac.sync.R
+import com.jsac.sync.utils.EmailValidator
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -22,8 +23,8 @@ class LoginFragment : Fragment(R.layout.fragment_login) {
     ) {
         super.onViewCreated(view, savedInstanceState)
 
-        val etUsername =
-            view.findViewById<EditText>(R.id.etUsername)
+        val etEmail =
+            view.findViewById<EditText>(R.id.etUsername)  // Changed to Email
 
         val etPassword =
             view.findViewById<EditText>(R.id.etPassword)
@@ -34,20 +35,31 @@ class LoginFragment : Fragment(R.layout.fragment_login) {
         val btnGoToRegister =
             view.findViewById<Button>(R.id.btnGoToRegister)
 
+        val btnForgotPassword =
+            view.findViewById<Button>(R.id.btnForgotPassword)
+
         btnLogin.setOnClickListener {
 
-            val username =
-                etUsername.text.toString()
+            val email = etEmail.text.toString().trim()
+            val password = etPassword.text.toString()
 
-            val password =
-                etPassword.text.toString()
+            // Validate email
+            val emailError = EmailValidator.getEmailErrorMessage(email)
+            if (emailError != null) {
+                Toast.makeText(requireContext(), emailError, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Validate password
+            if (password.isEmpty()) {
+                Toast.makeText(requireContext(), "Password cannot be empty", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
             viewModel.login(
-                username,
+                email,
                 password,
-
                 onSuccess = {
-
                     Toast.makeText(
                         requireContext(),
                         "Login Successful",
@@ -58,9 +70,7 @@ class LoginFragment : Fragment(R.layout.fragment_login) {
                         R.id.action_login_to_home
                     )
                 },
-
                 onError = { error ->
-
                     Toast.makeText(
                         requireContext(),
                         error,
@@ -71,9 +81,15 @@ class LoginFragment : Fragment(R.layout.fragment_login) {
         }
 
         btnGoToRegister.setOnClickListener {
-
             findNavController().navigate(
                 R.id.action_login_to_register
+            )
+        }
+
+        // NEW: Navigate to Forgot Password
+        btnForgotPassword.setOnClickListener {
+            findNavController().navigate(
+                R.id.action_login_to_forgot_password
             )
         }
     }
