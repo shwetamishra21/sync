@@ -12,13 +12,19 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
+import java.util.concurrent.TimeUnit
 
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    private const val BASE_URL =
-        "http://10.0.2.2:5000/"
+    // 🎯 YOUR BACKEND IP - From VS Code Flask terminal: 192.168.87.80
+    private const val BASE_URL = "http://192.168.87.80:5000/"
+
+    // If you need to change it later, use these alternatives:
+    // private const val BASE_URL = "http://10.0.2.2:5000/"         // Only for emulator on same machine
+    // private const val BASE_URL = "http://localhost:5000/"        // Only on same machine
+    // private const val BASE_URL = "http://YOUR_IP:5000/"          // Replace YOUR_IP with your machine IP
 
     @Provides
     @Singleton
@@ -28,9 +34,10 @@ object NetworkModule {
 
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
-            .addInterceptor(
-                LoggingInterceptor.create()
-            )
+            .addInterceptor(LoggingInterceptor.create())
+            .connectTimeout(30, TimeUnit.SECONDS)  // 30 seconds timeout
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
 
@@ -43,9 +50,7 @@ object NetworkModule {
         return Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)
-            .addConverterFactory(
-                GsonConverterFactory.create()
-            )
+            .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
@@ -55,9 +60,7 @@ object NetworkModule {
         retrofit: Retrofit
     ): HealthApi {
 
-        return retrofit.create(
-            HealthApi::class.java
-        )
+        return retrofit.create(HealthApi::class.java)
     }
 
     @Provides
@@ -66,8 +69,6 @@ object NetworkModule {
         retrofit: Retrofit
     ): AuthApi {
 
-        return retrofit.create(
-            AuthApi::class.java
-        )
+        return retrofit.create(AuthApi::class.java)
     }
 }

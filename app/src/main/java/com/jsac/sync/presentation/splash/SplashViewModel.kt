@@ -1,5 +1,6 @@
 package com.jsac.sync.presentation.splash
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.jsac.sync.data.local.datastore.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,8 +15,13 @@ class SplashViewModel @Inject constructor(
 
     val isLoggedIn: Flow<Boolean> =
 
-        sessionManager.token.map {
+        sessionManager.token.map { token ->
 
-            !it.isNullOrEmpty()
+            val loggedIn = !token.isNullOrEmpty()
+
+            // Debug logging to track token state
+            Log.d("SplashViewModel", "🔍 Token check - Value: '${token ?: "NULL"}', isLoggedIn: $loggedIn")
+
+            loggedIn
         }
 }

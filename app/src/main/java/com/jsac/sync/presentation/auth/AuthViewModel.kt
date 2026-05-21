@@ -1,5 +1,6 @@
 package com.jsac.sync.presentation.auth
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jsac.sync.data.local.datastore.SessionManager
@@ -20,6 +21,8 @@ class AuthViewModel @Inject constructor(
         onResult: (String) -> Unit
     ) {
 
+        Log.d("AuthViewModel", "📝 Register attempt - Username: $username")
+
         viewModelScope.launch {
 
             try {
@@ -32,6 +35,8 @@ class AuthViewModel @Inject constructor(
 
                 if (response.isSuccessful) {
 
+                    Log.d("AuthViewModel", "✅ Registration successful")
+
                     onResult(
                         response.body()?.message
                             ?: "Registration successful"
@@ -39,12 +44,16 @@ class AuthViewModel @Inject constructor(
 
                 } else {
 
+                    Log.d("AuthViewModel", "❌ Registration failed - Status: ${response.code()}")
+
                     onResult(
                         "Registration failed"
                     )
                 }
 
             } catch (e: Exception) {
+
+                Log.e("AuthViewModel", "❌ Register exception: ${e.message}", e)
 
                 onResult(
                     e.message ?: "Unknown error"
@@ -59,6 +68,8 @@ class AuthViewModel @Inject constructor(
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
+
+        Log.d("AuthViewModel", "🔐 Login attempt - Username: $username")
 
         viewModelScope.launch {
 
@@ -77,13 +88,19 @@ class AuthViewModel @Inject constructor(
                     val token =
                         response.body()!!.token
 
+                    Log.d("AuthViewModel", "✅ Login successful - Token received (length: ${token.length})")
+
                     sessionManager.saveToken(
                         token
                     )
 
+                    Log.d("AuthViewModel", "💾 Token persisted to DataStore")
+
                     onSuccess()
 
                 } else {
+
+                    Log.d("AuthViewModel", "❌ Login failed - Status: ${response.code()}, Body: ${response.body()}")
 
                     onError(
                         "Invalid credentials"
@@ -91,6 +108,8 @@ class AuthViewModel @Inject constructor(
                 }
 
             } catch (e: Exception) {
+
+                Log.e("AuthViewModel", "❌ Login exception: ${e.message}", e)
 
                 onError(
                     e.message ?: "Unknown error"
@@ -101,9 +120,13 @@ class AuthViewModel @Inject constructor(
 
     fun logout() {
 
+        Log.d("AuthViewModel", "🚪 Logout initiated")
+
         viewModelScope.launch {
 
             sessionManager.clearSession()
+
+            Log.d("AuthViewModel", "✅ Logout complete - Session cleared")
         }
     }
 }
