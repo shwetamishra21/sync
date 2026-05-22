@@ -36,6 +36,11 @@
         <action
             android:id="@+id/action_login_to_register"
             app:destination="@id/registerFragment"/>
+
+        <!-- ✅ FIXED: Added forgot password navigation -->
+        <action
+            android:id="@+id/action_login_to_forgot_password"
+            app:destination="@id/forgotPasswordFragment"/>
     </fragment>
 
     <!-- Register -->
@@ -50,26 +55,7 @@
             app:destination="@id/loginFragment"/>
     </fragment>
 
-    <!-- Home -->
-
-    <fragment
-        android:id="@+id/homeFragment"
-        android:name="com.jsac.sync.presentation.home.HomeFragment"
-        android:label="Home">
-
-        <!-- NEW ACTION: Navigate from Home back to Login on logout -->
-        <action
-            android:id="@+id/action_home_to_login"
-            app:destination="@id/loginFragment"
-            app:popUpTo="@id/splashFragment"
-            app:popUpToInclusive="true"/>
-    </fragment>
-    <!-- Add these actions to loginFragment -->
-    <action
-        android:id="@+id/action_login_to_forgot_password"
-        app:destination="@id/forgotPasswordFragment"/>
-
-    <!-- Add these fragments -->
+    <!-- ✅ FIXED: Added ForgotPasswordFragment -->
     <fragment
         android:id="@+id/forgotPasswordFragment"
         android:name="com.jsac.sync.presentation.auth.ForgotPasswordFragment"
@@ -78,8 +64,13 @@
         <action
             android:id="@+id/action_forgot_password_to_reset_password"
             app:destination="@id/resetPasswordFragment"/>
+
+        <action
+            android:id="@+id/action_forgot_password_to_login"
+            app:destination="@id/loginFragment"/>
     </fragment>
 
+    <!-- ✅ FIXED: Added ResetPasswordFragment -->
     <fragment
         android:id="@+id/resetPasswordFragment"
         android:name="com.jsac.sync.presentation.auth.ResetPasswordFragment"
@@ -87,6 +78,23 @@
 
         <action
             android:id="@+id/action_reset_password_to_login"
-            app:destination="@id/loginFragment"/>
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="true"/>
     </fragment>
+
+    <!-- Home -->
+
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.jsac.sync.presentation.home.HomeFragment"
+        android:label="Home">
+
+        <action
+            android:id="@+id/action_home_to_login"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/splashFragment"
+            app:popUpToInclusive="true"/>
+    </fragment>
+
 </navigation>

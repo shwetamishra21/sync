@@ -12,6 +12,10 @@ import com.jsac.sync.R
 import com.jsac.sync.utils.EmailValidator
 import dagger.hilt.android.AndroidEntryPoint
 
+/**
+ * ✅ FIXED: Updated to pass 'username' parameter to ViewModel
+ * This aligns with the backend's expectation of 'username' field
+ */
 @AndroidEntryPoint
 class ForgotPasswordFragment : Fragment(R.layout.fragment_forgot_password) {
 
@@ -38,8 +42,9 @@ class ForgotPasswordFragment : Fragment(R.layout.fragment_forgot_password) {
                 return@setOnClickListener
             }
 
+            // ✅ FIXED: Pass email as 'username' parameter to match backend
             viewModel.requestPasswordReset(
-                email,
+                email,  // This is the username from the backend perspective
                 onSuccess = {
                     Toast.makeText(
                         requireContext(),
@@ -47,9 +52,9 @@ class ForgotPasswordFragment : Fragment(R.layout.fragment_forgot_password) {
                         Toast.LENGTH_SHORT
                     ).show()
 
-                    // Navigate to reset password screen
+                    // Navigate to reset password screen with the username
                     val bundle = Bundle().apply {
-                        putString("email", email)
+                        putString("username", email)  // ✅ FIXED: Pass as 'username'
                     }
 
                     findNavController().navigate(
@@ -61,7 +66,7 @@ class ForgotPasswordFragment : Fragment(R.layout.fragment_forgot_password) {
                     Toast.makeText(
                         requireContext(),
                         error,
-                        Toast.LENGTH_SHORT
+                        Toast.LENGTH_LONG
                     ).show()
                 }
             )

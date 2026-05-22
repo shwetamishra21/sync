@@ -9,12 +9,11 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.jsac.sync.R
-import com. jsac. sync. utils. EmailValidator
+import com.jsac.sync.utils.EmailValidator
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class RegisterFragment : Fragment(R.layout.fragment_register) {
-
 
     private val viewModel: AuthViewModel by viewModels()
 
@@ -22,15 +21,20 @@ class RegisterFragment : Fragment(R.layout.fragment_register) {
         view: View,
         savedInstanceState: Bundle?
     ) {
-        // Add to RegisterFragment.kt
-        val etEmail = view.findViewById<EditText>(R.id.etUsername)
+        super.onViewCreated(view, savedInstanceState)
+
+        val etUsername = view.findViewById<EditText>(R.id.etUsername)
+        val etPassword = view.findViewById<EditText>(R.id.etPassword)
+        val btnRegister = view.findViewById<Button>(R.id.btnRegister)
+        val btnGoToLogin = view.findViewById<Button>(R.id.btnGoToLogin)
 
         btnRegister.setOnClickListener {
-            val email = etEmail.text.toString().trim()
+
+            val username = etUsername.text.toString().trim()
             val password = etPassword.text.toString()
 
             // Validate email
-            val emailError = EmailValidator.getEmailErrorMessage(email)
+            val emailError = EmailValidator.getEmailErrorMessage(username)
             if (emailError != null) {
                 Toast.makeText(requireContext(), emailError, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -38,39 +42,13 @@ class RegisterFragment : Fragment(R.layout.fragment_register) {
 
             // Validate password
             if (password.length < 6) {
-                Toast.makeText(requireContext(), "Password must be at least 6 characters", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    requireContext(),
+                    "Password must be at least 6 characters",
+                    Toast.LENGTH_SHORT
+                ).show()
                 return@setOnClickListener
             }
-
-            viewModel.register(email, password) { result ->
-                Toast.makeText(requireContext(), result, Toast.LENGTH_SHORT).show()
-
-                if (result.contains("successful", true)) {
-                    findNavController().navigate(R.id.action_register_to_login)
-                }
-            }
-        }
-        super.onViewCreated(view, savedInstanceState)
-
-        val etUsername =
-            view.findViewById<EditText>(R.id.etUsername)
-
-        val etPassword =
-            view.findViewById<EditText>(R.id.etPassword)
-
-        val btnRegister =
-            view.findViewById<Button>(R.id.btnRegister)
-
-        val btnGoToLogin =
-            view.findViewById<Button>(R.id.btnGoToLogin)
-
-        btnRegister.setOnClickListener {
-
-            val username =
-                etUsername.text.toString()
-
-            val password =
-                etPassword.text.toString()
 
             viewModel.register(
                 username,
@@ -83,12 +61,7 @@ class RegisterFragment : Fragment(R.layout.fragment_register) {
                     Toast.LENGTH_SHORT
                 ).show()
 
-                if (
-                    result.contains(
-                        "successful",
-                        true
-                    )
-                ) {
+                if (result.contains("successful", true)) {
 
                     findNavController().navigate(
                         R.id.action_register_to_login

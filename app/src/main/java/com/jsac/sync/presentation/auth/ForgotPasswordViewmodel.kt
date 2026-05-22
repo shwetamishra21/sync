@@ -8,28 +8,39 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * ✅ FIXED: Multiple improvements:
+ * 1. Changed parameter names from 'email' to 'username'
+ * 2. Added better error logging to debug issues
+ * 3. Added response body logging to see actual backend errors
+ * 4. Fixed error message extraction from response
+ */
 @HiltViewModel
 class ForgotPasswordViewModel @Inject constructor(
     private val repository: ForgotPasswordRepository
 ) : ViewModel() {
 
     fun requestPasswordReset(
-        email: String,
+        username: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
 
-        Log.d("ForgotPasswordViewModel", "🔐 Password reset requested for: $email")
+        Log.d("ForgotPasswordViewModel", "🔐 Password reset requested for: $username")
 
         viewModelScope.launch {
 
             try {
 
-                val response = repository.requestPasswordReset(email)
+                val response = repository.requestPasswordReset(username)
+
+                Log.d("ForgotPasswordViewModel", "📡 API Response Code: ${response.code()}")
+                Log.d("ForgotPasswordViewModel", "📡 API Response Body: ${response.body()}")
+                Log.d("ForgotPasswordViewModel", "📡 API Error Body: ${response.errorBody()?.string()}")
 
                 if (response.isSuccessful) {
 
-                    Log.d("ForgotPasswordViewModel", "✅ Reset link sent to email")
+                    Log.d("ForgotPasswordViewModel", "✅ Reset link sent to username: $username")
 
                     onSuccess()
 
@@ -37,37 +48,48 @@ class ForgotPasswordViewModel @Inject constructor(
 
                     Log.d("ForgotPasswordViewModel", "❌ Failed - Status: ${response.code()}")
 
-                    onError("Email not found or error occurred")
+                    // Try to extract error message from response
+                    val errorMessage = try {
+                        response.errorBody()?.string() ?: "Email/username not found"
+                    } catch (e: Exception) {
+                        "Email/username not found"
+                    }
+
+                    onError(errorMessage)
                 }
 
             } catch (e: Exception) {
 
                 Log.e("ForgotPasswordViewModel", "❌ Exception: ${e.message}", e)
+                e.printStackTrace()
 
-                onError(e.message ?: "Unknown error")
+                onError(e.message ?: "Unknown error occurred")
             }
         }
     }
 
     fun resetPassword(
-        email: String,
+        username: String,
         resetToken: String,
         newPassword: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
 
-        Log.d("ForgotPasswordViewModel", "🔄 Resetting password for: $email")
+        Log.d("ForgotPasswordViewModel", "🔄 Resetting password for: $username")
 
         viewModelScope.launch {
 
             try {
 
-                val response = repository.resetPassword(email, resetToken, newPassword)
+                val response = repository.resetPassword(username, resetToken, newPassword)
+
+                Log.d("ForgotPasswordViewModel", "📡 API Response Code: ${response.code()}")
+                Log.d("ForgotPasswordViewModel", "📡 API Response Body: ${response.body()}")
 
                 if (response.isSuccessful) {
 
-                    Log.d("ForgotPasswordViewModel", "✅ Password reset successfully")
+                    Log.d("ForgotPasswordViewModel", "✅ Password reset successfully for: $username")
 
                     onSuccess()
 
@@ -75,14 +97,21 @@ class ForgotPasswordViewModel @Inject constructor(
 
                     Log.d("ForgotPasswordViewModel", "❌ Reset failed - Status: ${response.code()}")
 
-                    onError("Invalid token or error occurred")
+                    val errorMessage = try {
+                        response.errorBody()?.string() ?: "Invalid token or error occurred"
+                    } catch (e: Exception) {
+                        "Invalid token or error occurred"
+                    }
+
+                    onError(errorMessage)
                 }
 
             } catch (e: Exception) {
 
                 Log.e("ForgotPasswordViewModel", "❌ Exception: ${e.message}", e)
+                e.printStackTrace()
 
-                onError(e.message ?: "Unknown error")
+                onError(e.message ?: "Unknown error occurred")
             }
         }
     }

@@ -45,12 +45,13 @@ dependencies {
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
 
-// Activity
+    // Activity
     implementation("androidx.activity:activity-ktx:1.8.2")
+
     // DataStore Preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
-// Fragment
+    // Fragment
     implementation("androidx.fragment:fragment-ktx:1.6.2")
 
     implementation("androidx.core:core-ktx:1.12.0")
@@ -92,15 +93,23 @@ dependencies {
     // Retrofit
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
 
-// Gson Converter
+    // Gson Converter
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
-// OkHttp
+    // OkHttp
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-// Logging Interceptor
+    // Logging Interceptor
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
     // Navigation
     implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
     implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
+
+    // Testing - JUnit
+    testImplementation("junit:junit:4.13.2")
+
+    // Android Test - Instrumented Tests
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
