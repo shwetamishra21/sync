@@ -1,0 +1,44 @@
+{
+  "method": "Method 1 \u2014 Rule-Based (spaCy)",
+  "dataset": "raquiba/Sarcasm_News_Headline",
+  "dataset_size": 55328,
+  "train_size": 44262,
+  "test_size": 11066,
+  "approach": "Linguistic rule engine \u2014 no training required",
+  "spacy_model": "en_core_web_sm",
+  "decision_threshold": 2,
+  "signals_used": [
+    "hyperbole",
+    "ironic_quotes",
+    "exclamation",
+    "onion_pattern",
+    "sentiment_incongruity",
+    "negation_positive",
+    "explicit_incongruity"
+  ],
+  "metrics": {
+    "model": "Rule-Based (spaCy, threshold=2)",
+    "TP": 176,
+    "TN": 5935,
+    "FP": 59,
+    "FN": 4896,
+    "Accuracy": 0.5522,
+    "Precision": 0.7489,
+    "Recall": 0.0347,
+    "F1": 0.0663,
+    "Sensitivity": 0.0347,
+    "Specificity": 0.9902,
+    "FPR": 0.0098,
+    "FNR": 0.9653,
+    "NPV": 0.548,
+    "FDR": 0.2511,
+    "MCC": 0.0859,
+    "ROC_AUC": 0.469
+  },
+  "figures": [
+    "figures/rb_eval_01_confusion_matrix.png",
+    "figures/rb_eval_02_metrics_bar.png",
+    "figures/rb_eval_03_signal_rates.png",
+    "figures/rb_eval_04_score_distribution.png"
+  ]
+}
