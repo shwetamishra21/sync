@@ -1,4 +1,0 @@
-MONGODB_URI=mongodb://127.0.0.1:27017/stratify
-
-NEXTAUTH_SECRET=StratifyAuthSecret123456789
-NEXTAUTH_URL=http://localhost:3000
