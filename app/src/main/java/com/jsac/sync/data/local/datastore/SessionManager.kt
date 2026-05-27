@@ -63,6 +63,7 @@ class SessionManager(
             token
         }
 
+
     // Debug helper - call this to check current token state
     suspend fun debugPrintToken() {
         context.dataStore.data.collect { preferences ->
