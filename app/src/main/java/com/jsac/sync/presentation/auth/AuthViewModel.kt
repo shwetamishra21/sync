@@ -90,13 +90,17 @@ class AuthViewModel @Inject constructor(
 
                     Log.d("AuthViewModel", "✅ Login successful - Token received (length: ${token.length})")
 
-                    sessionManager.saveToken(
-                        token
-                    )
+                    // ✅ FIXED: Now we wait for token to be saved before calling onSuccess()
+                    // Previously saveToken() was async and returned immediately,
+                    // causing a race condition where navigation happened before token was persisted
+                    viewModelScope.launch {
+                        sessionManager.saveToken(token)
 
-                    Log.d("AuthViewModel", "💾 Token persisted to DataStore")
+                        Log.d("AuthViewModel", "💾 Token persisted to DataStore")
 
-                    onSuccess()
+                        // Only call onSuccess() after token is actually saved
+                        onSuccess()
+                    }
 
                 } else {
 

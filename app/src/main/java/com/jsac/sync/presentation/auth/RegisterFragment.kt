@@ -50,10 +50,18 @@ class RegisterFragment : Fragment(R.layout.fragment_register) {
                 return@setOnClickListener
             }
 
+            // ✅ FIXED (FIX #6): Disable button during registration to prevent multiple clicks
+            btnRegister.isEnabled = false
+            btnRegister.text = "Registering..."
+
             viewModel.register(
                 username,
                 password
             ) { result ->
+
+                // ✅ Re-enable button after registration completes
+                btnRegister.isEnabled = true
+                btnRegister.text = "Register"
 
                 Toast.makeText(
                     requireContext(),

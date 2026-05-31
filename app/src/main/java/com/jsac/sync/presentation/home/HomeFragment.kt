@@ -23,22 +23,45 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
         Log.d("HomeFragment", "🏠 Home screen loaded")
 
-        val btnLogout = view.findViewById<Button>(R.id.btnLogout)
-
-        btnLogout.setOnClickListener {
-            Log.d("HomeFragment", "🚪 Logout button clicked")
-
-            viewModel.logout()
-
-            // Navigate back to Login after logout
-            try {
-                findNavController().navigate(
-                    R.id.action_home_to_login
-                )
-                Log.d("HomeFragment", "✅ Navigated to Login after logout")
-            } catch (e: Exception) {
-                Log.e("HomeFragment", "❌ Navigation error: ${e.message}", e)
+        try {
+            val btnViewForms = view.findViewById<Button>(R.id.btnViewForms)
+            if (btnViewForms != null) {
+                btnViewForms.setOnClickListener {
+                    Log.d("HomeFragment", "📋 Navigate to dashboard")
+                    try {
+                        findNavController().navigate(R.id.action_home_to_dashboard)
+                    } catch (e: Exception) {
+                        Log.e("HomeFragment", "❌ Navigation error: ${e.message}", e)
+                    }
+                }
+            } else {
+                Log.w("HomeFragment", "⚠️ btnViewForms not found in layout")
             }
+        } catch (e: Exception) {
+            Log.e("HomeFragment", "❌ Error finding btnViewForms: ${e.message}", e)
+        }
+
+        try {
+            val btnLogout = view.findViewById<Button>(R.id.btnLogout)
+            if (btnLogout != null) {
+                btnLogout.setOnClickListener {
+                    Log.d("HomeFragment", "🚪 Logout button clicked")
+                    viewModel.logout()
+
+                    try {
+                        findNavController().navigate(
+                            R.id.action_home_to_login
+                        )
+                        Log.d("HomeFragment", "✅ Navigated to Login after logout")
+                    } catch (e: Exception) {
+                        Log.e("HomeFragment", "❌ Navigation error: ${e.message}", e)
+                    }
+                }
+            } else {
+                Log.w("HomeFragment", "⚠️ btnLogout not found in layout")
+            }
+        } catch (e: Exception) {
+            Log.e("HomeFragment", "❌ Error finding btnLogout: ${e.message}", e)
         }
     }
 }

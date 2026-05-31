@@ -22,7 +22,9 @@ class ResetPasswordFragment : Fragment(R.layout.fragment_reset_password) {
     ) {
         super.onViewCreated(view, savedInstanceState)
 
-        val email = arguments?.getString("email") ?: ""
+        // ✅ FIXED: Changed from getString("email") to getString("username")
+        // This matches the key that ForgotPasswordFragment passes
+        val email = arguments?.getString("username") ?: ""
 
         val etResetToken = view.findViewById<EditText>(R.id.etResetToken)
         val etNewPassword = view.findViewById<EditText>(R.id.etNewPassword)

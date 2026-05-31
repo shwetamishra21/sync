@@ -1,10 +1,10 @@
 package com.jsac.sync.di
 
 import com.jsac.sync.data.remote.api.AuthApi
+import com.jsac.sync.data.remote.api.FormApi
 import com.jsac.sync.data.remote.api.ForgotPasswordApi
 import com.jsac.sync.data.remote.api.HealthApi
 import com.jsac.sync.data.remote.interceptor.AuthInterceptor
-import com.jsac.sync.data.remote.interceptor.LoggingInterceptor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,32 +20,22 @@ import java.util.concurrent.TimeUnit
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    // 🎯 YOUR BACKEND IP - From VS Code Flask terminal: 192.168.87.80
-    // For Android Emulator on same machine, use: 10.0.2.2 (this is the host machine IP from emulator perspective)
-    private const val BASE_URL = "http://192.168.87.80:5000/"
-
-    // Alternative base URLs:
-    // private const val BASE_URL = "http://10.0.2.2:5000/"         // Only for emulator on same machine
-    // private const val BASE_URL = "http://localhost:5000/"        // Only on same machine
-    // private const val BASE_URL = "http://YOUR_IP:5000/"          // Replace YOUR_IP with your machine IP
-
+    private const val BASE_URL = "http://192.168.144.80:5000/"
     @Provides
     @Singleton
     fun provideOkHttpClient(
         authInterceptor: AuthInterceptor
     ): OkHttpClient {
 
-        // ✅ FIXED: Added explicit HTTP logging for debugging
         val loggingInterceptor = HttpLoggingInterceptor { message ->
-            // Log both request and response bodies for debugging
             println("🌐 HTTP LOG: $message")
         }.apply {
-            level = HttpLoggingInterceptor.Level.BODY  // Log full request/response body
+            level = HttpLoggingInterceptor.Level.BODY
         }
 
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
-            .addInterceptor(loggingInterceptor)  // ✅ Added logging interceptor
+            .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -90,5 +80,14 @@ object NetworkModule {
     ): ForgotPasswordApi {
 
         return retrofit.create(ForgotPasswordApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideFormApi(
+        retrofit: Retrofit
+    ): FormApi {
+
+        return retrofit.create(FormApi::class.java)
     }
 }

@@ -56,10 +56,18 @@ class LoginFragment : Fragment(R.layout.fragment_login) {
                 return@setOnClickListener
             }
 
+            // ✅ FIXED (FIX #6): Disable button during login to prevent multiple clicks
+            btnLogin.isEnabled = false
+            btnLogin.text = "Logging in..."
+
             viewModel.login(
                 email,
                 password,
                 onSuccess = {
+                    // ✅ Re-enable button on success
+                    btnLogin.isEnabled = true
+                    btnLogin.text = "Login"
+
                     Toast.makeText(
                         requireContext(),
                         "Login Successful",
@@ -71,6 +79,10 @@ class LoginFragment : Fragment(R.layout.fragment_login) {
                     )
                 },
                 onError = { error ->
+                    // ✅ Re-enable button on error
+                    btnLogin.isEnabled = true
+                    btnLogin.text = "Login"
+
                     Toast.makeText(
                         requireContext(),
                         error,

@@ -1,3 +1,10 @@
+// ✅ UPDATED build.gradle.kts for app module
+// This file should replace app/build.gradle.kts
+// Key changes:
+// 1. Added buildConfigField for API_BASE_URL in debug/release builds
+// 2. Added manifestPlaceholders for usesCleartextTraffic
+// 3. Now you can change BASE_URL without rebuilding for different environments
+
 plugins {
 
     id("com.android.application")
@@ -22,8 +29,29 @@ android {
     }
 
     buildTypes {
+        debug {
+            isMinifyEnabled = false
+
+            // ✅ FIXED (FIX #2): Set API URL for debug builds
+            // Change YOUR_IP to match where your Flask backend is running:
+            // - "http://192.168.87.80:5000/" (for physical machine on network)
+            // - "http://10.0.2.2:5000/" (for Android Emulator on same machine)
+            // - "http://localhost:5000/" (for same machine, localhost)
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5000/\"")
+
+            // Allow cleartext (HTTP) traffic for development only
+            manifestPlaceholders["usesCleartextTraffic"] = true
+        }
+
         release {
             isMinifyEnabled = false
+
+            // ✅ FIXED (FIX #2): Set API URL for release builds
+            // IMPORTANT: Use HTTPS and your actual domain in production!
+            buildConfigField("String", "API_BASE_URL", "\"https://api.yourdomain.com/\"")
+
+            // Don't allow cleartext traffic in production
+            manifestPlaceholders["usesCleartextTraffic"] = false
         }
     }
 
@@ -38,6 +66,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true  // ✅ Enable BuildConfig generation
     }
 }
 
@@ -50,7 +79,12 @@ dependencies {
 
     // DataStore Preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
 
+    // Gson (for parsing JSON)
+    implementation("com.google.code.gson:gson:2.10.1")
     // Fragment
     implementation("androidx.fragment:fragment-ktx:1.6.2")
 

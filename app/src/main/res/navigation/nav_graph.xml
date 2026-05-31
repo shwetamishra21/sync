@@ -7,7 +7,6 @@
     app:startDestination="@id/splashFragment">
 
     <!-- Splash -->
-
     <fragment
         android:id="@+id/splashFragment"
         android:name="com.jsac.sync.presentation.splash.SplashFragment"
@@ -23,7 +22,6 @@
     </fragment>
 
     <!-- Login -->
-
     <fragment
         android:id="@+id/loginFragment"
         android:name="com.jsac.sync.presentation.auth.LoginFragment"
@@ -37,14 +35,12 @@
             android:id="@+id/action_login_to_register"
             app:destination="@id/registerFragment"/>
 
-        <!-- ✅ FIXED: Added forgot password navigation -->
         <action
             android:id="@+id/action_login_to_forgot_password"
             app:destination="@id/forgotPasswordFragment"/>
     </fragment>
 
     <!-- Register -->
-
     <fragment
         android:id="@+id/registerFragment"
         android:name="com.jsac.sync.presentation.auth.RegisterFragment"
@@ -55,7 +51,7 @@
             app:destination="@id/loginFragment"/>
     </fragment>
 
-    <!-- ✅ FIXED: Added ForgotPasswordFragment -->
+    <!-- Forgot Password -->
     <fragment
         android:id="@+id/forgotPasswordFragment"
         android:name="com.jsac.sync.presentation.auth.ForgotPasswordFragment"
@@ -70,7 +66,7 @@
             app:destination="@id/loginFragment"/>
     </fragment>
 
-    <!-- ✅ FIXED: Added ResetPasswordFragment -->
+    <!-- Reset Password -->
     <fragment
         android:id="@+id/resetPasswordFragment"
         android:name="com.jsac.sync.presentation.auth.ResetPasswordFragment"
@@ -84,17 +80,38 @@
     </fragment>
 
     <!-- Home -->
-
     <fragment
         android:id="@+id/homeFragment"
         android:name="com.jsac.sync.presentation.home.HomeFragment"
         android:label="Home">
 
         <action
+            android:id="@+id/action_home_to_dashboard"
+            app:destination="@id/dashboardFragment"/>
+
+        <action
             android:id="@+id/action_home_to_login"
             app:destination="@id/loginFragment"
             app:popUpTo="@id/splashFragment"
             app:popUpToInclusive="true"/>
+    </fragment>
+
+    <!-- Dashboard -->
+    <fragment
+        android:id="@+id/dashboardFragment"
+        android:name="com.jsac.sync.presentation.dashboard.DashboardFragment"
+        android:label="Dashboard">
+
+        <action
+            android:id="@+id/action_dashboard_to_form_detail"
+            app:destination="@id/formDetailFragment"/>
+    </fragment>
+
+    <!-- Form Detail (Placeholder for Part 5) -->
+    <fragment
+        android:id="@+id/formDetailFragment"
+        android:name="com.jsac.sync.presentation.dashboard.FormDetailFragment"
+        android:label="Form Detail">
     </fragment>
 
 </navigation>
