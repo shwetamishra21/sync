@@ -13,10 +13,7 @@ from models.user_model import User
 app = Flask(__name__)
 load_dotenv()
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-    "DATABASE_URL"
-)
-
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
@@ -281,26 +278,16 @@ def login():
 
 @app.route('/forgot-password', methods=['POST'])
 def forgot_password():
-    """
-    Request password reset token
-    
-    Expected JSON:
-    {
-        "username": "user@example.com"
-    }
-    """
     print("\n[PASSWORD] POST /forgot-password called")
     
     try:
         data = request.get_json()
         username = data.get('username')
         
-        # Validate username
         if not username:
             print("[PASSWORD] Username is required")
             return {"message": "Username is required"}, 400
         
-        # Check if user exists in database
         user = User.query.filter_by(
             username=username
         ).first()
@@ -309,7 +296,6 @@ def forgot_password():
             print(f"[PASSWORD] User {username} not found")
             return {"message": "User not found"}, 404
         
-        # Generate secure reset token
         reset_token = secrets.token_urlsafe(32)
         reset_tokens[reset_token] = {
             'username': username,
@@ -317,7 +303,6 @@ def forgot_password():
             'expires_at': datetime.datetime.utcnow() + timedelta(hours=1)
         }
         
-        # For development/testing, print token to console
         print(f"\n{'='*50}")
         print(f"Reset token for {username}:")
         print(f"Token: {reset_token}")
@@ -336,16 +321,6 @@ def forgot_password():
 
 @app.route('/reset-password', methods=['POST'])
 def reset_password():
-    """
-    Reset password with token
-    
-    Expected JSON:
-    {
-        "username": "user@example.com",
-        "reset_token": "token_from_email",
-        "new_password": "newpassword123"
-    }
-    """
     print("\n[PASSWORD] POST /reset-password called")
     
     try:
@@ -354,7 +329,6 @@ def reset_password():
         reset_token = data.get('reset_token')
         new_password = data.get('new_password')
         
-        # Validate inputs
         if not all([username, reset_token, new_password]):
             print("[PASSWORD] Missing required fields")
             return {"message": "Username, token, and password are required"}, 400
@@ -363,25 +337,21 @@ def reset_password():
             print("[PASSWORD] Password too short")
             return {"message": "Password must be at least 6 characters"}, 400
         
-        # Verify token exists
         if reset_token not in reset_tokens:
             print("[PASSWORD] Invalid or expired token")
             return {"message": "Invalid or expired token"}, 400
         
         token_data = reset_tokens[reset_token]
         
-        # Verify username matches
         if token_data['username'] != username:
             print("[PASSWORD] Username does not match token")
             return {"message": "Username does not match token"}, 400
         
-        # Verify token not expired
         if datetime.datetime.utcnow() > token_data['expires_at']:
             del reset_tokens[reset_token]
             print("[PASSWORD] Token has expired")
             return {"message": "Token has expired"}, 400
         
-        # Find user in database
         user = User.query.filter_by(
             username=username
         ).first()
@@ -390,7 +360,6 @@ def reset_password():
             print(f"[PASSWORD] User {username} not found")
             return {"message": "User not found"}, 404
         
-        # Hash and update password
         hashed_password = bcrypt.generate_password_hash(
             new_password
         ).decode("utf-8")
@@ -402,7 +371,6 @@ def reset_password():
         print(f"Password reset for: {username}")
         print(f"{'='*50}\n")
         
-        # Delete used token
         del reset_tokens[reset_token]
         
         return {"message": "Password reset successfully"}, 200
@@ -414,9 +382,6 @@ def reset_password():
 
 @app.route('/check-reset-token', methods=['POST'])
 def check_reset_token():
-    """
-    Verify if reset token is valid (optional endpoint for testing)
-    """
     print("\n[PASSWORD] POST /check-reset-token called")
     
     try:
@@ -467,15 +432,8 @@ def check_reset_token():
 @app.route("/forms", methods=["GET"])
 def get_forms():
     print("\n[FORMS] GET /forms called")
-    """
-    Get list of available forms
     
-    Returns:
-    - List of form metadata (id, name, description, version)
-    - NOT the full form fields (for performance)
-    """
     try:
-        # Return only metadata, not full field definitions
         form_list = [
             {
                 "id": form["id"],
@@ -504,17 +462,8 @@ def get_forms():
 @app.route("/forms/<form_id>", methods=["GET"])
 def get_form_detail(form_id):
     print(f"\n[FORMS] GET /forms/{form_id} called")
-    """
-    Get complete form definition including all fields
     
-    Args:
-    - form_id: The form identifier
-    
-    Returns:
-    - Complete form with all fields and configurations
-    """
     try:
-        # Find form by ID
         form = None
         for f in forms_db:
             if f["id"] == form_id:

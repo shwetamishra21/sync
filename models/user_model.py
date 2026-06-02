@@ -1,6 +1,5 @@
-from datetime import datetime
 from database.db import db
-
+import datetime
 
 class User(db.Model):
     __tablename__ = "users"
@@ -23,7 +22,7 @@ class User(db.Model):
 
     created_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow
+        default=datetime.datetime.utcnow
     )
 
     def __repr__(self):
