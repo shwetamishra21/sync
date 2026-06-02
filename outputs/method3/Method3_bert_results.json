@@ -1,0 +1,85 @@
+{
+  "method": "Method 3 \u2014 BERT fine-tuned (bert-base-uncased)",
+  "model_name": "bert-base-uncased",
+  "dataset": "raquiba/Sarcasm_News_Headline",
+  "dataset_size": 55328,
+  "train_size": 44267,
+  "val_size": 5528,
+  "test_size": 5533,
+  "hyperparams": {
+    "epochs": 4,
+    "batch_size": 32,
+    "learning_rate": 2e-05,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "max_len": 64,
+    "optimizer": "AdamW",
+    "scheduler": "linear warmup decay"
+  },
+  "training_history": {
+    "epoch": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "train_loss": [
+      0.272,
+      0.0817,
+      0.0283,
+      0.0097
+    ],
+    "val_loss": [
+      0.133,
+      0.1058,
+      0.1161,
+      0.1104
+    ],
+    "train_acc": [
+      0.8808,
+      0.9753,
+      0.993,
+      0.9976
+    ],
+    "val_acc": [
+      0.9508,
+      0.9738,
+      0.9756,
+      0.9825
+    ],
+    "val_f1": [
+      0.9453,
+      0.9711,
+      0.973,
+      0.9807
+    ]
+  },
+  "best_epoch": 4,
+  "best_val_f1": 0.9806965174129353,
+  "test_metrics": {
+    "model": "BERT fine-tuned (bert-base-uncased, epoch 4)",
+    "TP": 2504,
+    "TN": 2966,
+    "FP": 31,
+    "FN": 32,
+    "Accuracy": 0.9886,
+    "Precision": 0.9878,
+    "Recall": 0.9874,
+    "F1": 0.9876,
+    "Sensitivity": 0.9874,
+    "Specificity": 0.9897,
+    "FPR": 0.0103,
+    "FNR": 0.0126,
+    "NPV": 0.9893,
+    "FDR": 0.0122,
+    "MCC": 0.9771,
+    "ROC_AUC": 0.9979
+  },
+  "figures": [
+    "bert_01_training_curves.png",
+    "bert_02_confusion_matrix.png",
+    "bert_03_roc_curve.png",
+    "final_comparison_chart.png",
+    "final_metrics_heatmap.png"
+  ]
+}
