@@ -1,43 +1,45 @@
-# =========================
-# Python
-# =========================
+# Virtual Environment
 venv/
 .venv/
 env/
+Lib/
+Scripts/
+pyvenv.cfg
 
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
+.ipynb_checkpoints/
+*.bin
+*.safetensors
 
+# Environment & IDE
 .env
-
-# =========================
-# IDE
-# =========================
 .vscode/
 .idea/
-*.iml
+*.swp
+*.swo
 
-# =========================
-# Android
-# =========================
-.gradle/
-local.properties
-**/build/
-**/.cxx/
-
-# =========================
-# Logs
-# =========================
-*.log
-
-# =========================
 # OS
-# =========================
 .DS_Store
 Thumbs.db
+*.log
 
-# =========================
-# Outputs
-# =========================
-outputs/
+# Android Build Files
+*.iml
+.gradle/
+local.properties
+/build
+/captures
+.cxx
+
+# Project Directories
+/outputs/
+notebooks/
+Downloads/
+Videos/
+OneDrive/
+
+
