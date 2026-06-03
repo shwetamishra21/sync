@@ -1,6 +1,4 @@
-# Clean up .gitignore
-cat > .gitignore << 'EOF'
-# Android
+<<<<<<< HEAD
 *.iml
 .gradle
 /local.properties
@@ -12,29 +10,23 @@ cat > .gitignore << 'EOF'
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+OneDrive/
+notebooks/
+Downloads/
+Videos/
+README.md
 /captures
 .externalNativeBuild
 .cxx
 local.properties
-
-# Python & Backend
+=======
+# Python
 __pycache__/
 *.pyc
 .env
 .ipynb_checkpoints/
 *.bin
 *.safetensors
-
-# System
-OneDrive/
-notebooks/
-Downloads/
-Videos/
-EOF
-
-# Stage and commit
-git add .gitignore
-git commit -m "fix: resolve .gitignore merge conflicts"
-JSAC_BACKEND/
-
-JSAC_BACKEND/
+.DS_Store
+.vscode/
+>>>>>>> 8a839d189a0a3d8a74a0ca062a2cbc902ab6b977

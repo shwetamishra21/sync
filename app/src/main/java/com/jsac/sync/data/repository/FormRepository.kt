@@ -16,7 +16,6 @@ class FormRepository @Inject constructor(
 ) {
 
     fun getFormsList(): Flow<Result<List<FormEntity>>> = flow {
-        Log.d("FORM_DEBUG", "🚀 getFormsList() started")
         try {
             Log.d("FormRepository", "📦 Checking local cache for forms...")
             val cachedForms = dao.getAllForms()
@@ -29,9 +28,7 @@ class FormRepository @Inject constructor(
             }
 
             Log.d("FormRepository", "🌐 Fetching forms from API...")
-            Log.d("FORM_DEBUG", "🌐 About to call api.getFormsList()")
             val response = api.getFormsList()
-            Log.d("FORM_DEBUG", "🌐 Returned from api.getFormsList()")
 
             if (response.isSuccessful && response.body() != null) {
                 val formList = response.body()!!.forms
