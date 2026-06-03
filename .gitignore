@@ -1,32 +1,46 @@
-<<<<<<< HEAD
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-OneDrive/
-notebooks/
-Downloads/
-Videos/
-README.md
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-=======
+# Virtual Environment
+venv/
+.venv/
+env/
+Lib/
+Scripts/
+pyvenv.cfg
+
 # Python
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.egg-info/
 .ipynb_checkpoints/
 *.bin
 *.safetensors
-.DS_Store
+
+# Environment & IDE
+.env
 .vscode/
->>>>>>> 8a839d189a0a3d8a74a0ca062a2cbc902ab6b977
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Android Build Files
+*.iml
+.gradle/
+local.properties
+/build
+/captures
+.cxx
+
+# Project Directories
+/outputs/
+notebooks/
+Downloads/
+Videos/
+OneDrive/
+
+# JSAC Backend
+JSAC_BACKEND/
