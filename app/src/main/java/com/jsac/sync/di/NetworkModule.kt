@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    private const val BASE_URL = "http://192.168.144.80:5000/"
+    private const val BASE_URL = "http://192.168.144.80:5000"
     @Provides
     @Singleton
     fun provideOkHttpClient(
