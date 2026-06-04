@@ -1,5 +1,6 @@
 package com.jsac.sync.di
 
+import com.jsac.sync.BuildConfig
 import com.jsac.sync.data.remote.api.AuthApi
 import com.jsac.sync.data.remote.api.FormApi
 import com.jsac.sync.data.remote.api.ForgotPasswordApi
@@ -20,7 +21,6 @@ import java.util.concurrent.TimeUnit
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    private const val BASE_URL = "http://10.0.2.2:5000/"
     @Provides
     @Singleton
     fun provideOkHttpClient(
@@ -49,7 +49,7 @@ object NetworkModule {
     ): Retrofit {
 
         return Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(BuildConfig.API_BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()

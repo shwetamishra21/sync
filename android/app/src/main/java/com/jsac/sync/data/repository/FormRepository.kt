@@ -17,16 +17,6 @@ class FormRepository @Inject constructor(
 
     fun getFormsList(): Flow<Result<List<FormEntity>>> = flow {
         try {
-            Log.d("FormRepository", "📦 Checking local cache for forms...")
-            val cachedForms = dao.getAllForms()
-
-            cachedForms.collect { forms ->
-                if (forms.isNotEmpty()) {
-                    Log.d("FormRepository", "✅ Cached forms found: ${forms.size}")
-                    emit(Result.success(forms))
-                }
-            }
-
             Log.d("FormRepository", "🌐 Fetching forms from API...")
             val response = api.getFormsList()
 
@@ -47,19 +37,39 @@ class FormRepository @Inject constructor(
                     )
                 }
 
+                // Clear old cache and insert fresh data
+                dao.deleteAllForms()
                 dao.insertForms(entities)
-                Log.d("FormRepository", "💾 Forms cached locally")
+                Log.d("FormRepository", "💾 Forms cached locally: ${entities.size} forms")
 
                 emit(Result.success(entities))
 
             } else {
                 Log.e("FormRepository", "❌ API error: ${response.code()}")
+                Log.e("FormRepository", "❌ Error body: ${response.errorBody()?.string()}")
                 emit(Result.failure(Exception("API error: ${response.code()}")))
             }
 
         } catch (e: Exception) {
             Log.e("FormRepository", "❌ Exception: ${e.message}", e)
-            emit(Result.failure(e))
+            e.printStackTrace()
+
+            // Fallback to cached data if API fails
+            try {
+                Log.d("FormRepository", "📦 Falling back to cached forms...")
+                dao.getAllForms().collect { cachedForms ->
+                    if (cachedForms.isNotEmpty()) {
+                        Log.d("FormRepository", "✅ Using cached forms: ${cachedForms.size}")
+                        emit(Result.success(cachedForms))
+                    } else {
+                        Log.d("FormRepository", "❌ No cached forms available, emitting original error")
+                        emit(Result.failure(e))
+                    }
+                }
+            } catch (cacheError: Exception) {
+                Log.e("FormRepository", "❌ Cache error: ${cacheError.message}")
+                emit(Result.failure(e))
+            }
         }
     }
 
