@@ -5,6 +5,7 @@ import com.jsac.sync.data.remote.api.AuthApi
 import com.jsac.sync.data.remote.api.FormApi
 import com.jsac.sync.data.remote.api.ForgotPasswordApi
 import com.jsac.sync.data.remote.api.HealthApi
+import com.jsac.sync.data.remote.api.SubmissionApi
 import com.jsac.sync.data.remote.interceptor.AuthInterceptor
 import dagger.Module
 import dagger.Provides
@@ -48,19 +49,25 @@ object NetworkModule {
         okHttpClient: OkHttpClient
     ): Retrofit {
 
+        // Use BuildConfig for API URL (set in build.gradle.kts)
+        val baseUrl = BuildConfig.API_BASE_URL
+
         return Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE_URL)
+            .baseUrl(baseUrl)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
+
+    // ============================================
+    // API SERVICE PROVIDERS
+    // ============================================
 
     @Provides
     @Singleton
     fun provideHealthApi(
         retrofit: Retrofit
     ): HealthApi {
-
         return retrofit.create(HealthApi::class.java)
     }
 
@@ -69,7 +76,6 @@ object NetworkModule {
     fun provideAuthApi(
         retrofit: Retrofit
     ): AuthApi {
-
         return retrofit.create(AuthApi::class.java)
     }
 
@@ -78,7 +84,6 @@ object NetworkModule {
     fun provideForgotPasswordApi(
         retrofit: Retrofit
     ): ForgotPasswordApi {
-
         return retrofit.create(ForgotPasswordApi::class.java)
     }
 
@@ -87,7 +92,14 @@ object NetworkModule {
     fun provideFormApi(
         retrofit: Retrofit
     ): FormApi {
-
         return retrofit.create(FormApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSubmissionApi(
+        retrofit: Retrofit
+    ): SubmissionApi {
+        return retrofit.create(SubmissionApi::class.java)
     }
 }
