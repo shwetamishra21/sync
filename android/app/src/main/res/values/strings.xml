@@ -1,3 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">sync</string>
+
+    <!-- Home Fragment -->
+    <string name="home_title">Home</string>
+    <string name="home_subtitle">Welcome to JSAC Sync</string>
+    <string name="home_sync_status_label">📊 Sync Status</string>
+    <string name="home_pending_items">📋 %1$d pending item(s)</string>
+    <string name="home_synced_message">✅ Everything synced!</string>
+    <string name="home_view_forms">📋 View Forms</string>
+    <string name="home_manual_sync">🔄 Manual Sync</string>
+    <string name="home_logout">🚪 Logout</string>
+
+    <!-- Form Detail Fragment -->
+    <string name="form_submit_button">Submit Form</string>
+    <string name="form_submitting">Submitting...</string>
+    <string name="form_submit_success">✅ Form submitted successfully!</string>
+
+    <!-- General -->
+    <string name="loading">Loading...</string>
+    <string name="error_prefix">Error: </string>
+    <string name="retry">Retry</string>
+    <string name="cancel">Cancel</string>
 </resources>

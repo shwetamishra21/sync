@@ -3,16 +3,67 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
     android:orientation="vertical"
     android:padding="16dp">
 
+    <!-- Form Title -->
     <TextView
-        android:id="@+id/tvPlaceholder"
+        android:id="@+id/tvFormTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Form Detail Placeholder"
-        android:textSize="18sp"
-        android:gravity="center"/>
+        android:text="Form Title"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- Form Description -->
+    <TextView
+        android:id="@+id/tvFormDescription"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Form description"
+        android:textSize="14sp"
+        android:textColor="@android:color/darker_gray"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Loading Progress -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="32dp"
+        android:visibility="gone"/>
+
+    <!-- Error Message -->
+    <TextView
+        android:id="@+id/tvError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Error"
+        android:textColor="@android:color/holo_red_dark"
+        android:visibility="gone"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Form Fields Container (populated dynamically) -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/containerForm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"/>
+    </ScrollView>
+
+    <!-- Submit Button -->
+    <Button
+        android:id="@+id/btnSubmit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Submit Form"
+        android:layout_marginTop="16dp"/>
 
 </LinearLayout>

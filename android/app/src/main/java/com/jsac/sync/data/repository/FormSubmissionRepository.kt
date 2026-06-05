@@ -3,322 +3,263 @@ package com.jsac.sync.data.repository
 import android.util.Log
 import com.google.gson.Gson
 import com.jsac.sync.data.local.db.dao.FormSubmissionDao
-import com.jsac.sync.data.local.db.dao.SyncQueueDao
+import com.jsac.sync.data.local.db.dao.MediaFileDao
 import com.jsac.sync.data.local.db.entity.FormSubmissionEntity
-import com.jsac.sync.data.local.db.entity.SyncQueueEntity
+import com.jsac.sync.data.local.db.entity.MediaFileEntity
 import com.jsac.sync.data.local.db.entity.SyncStatus
-import com.jsac.sync.data.local.db.entity.OperationType
+import com.jsac.sync.data.local.db.entity.UploadStatus
 import com.jsac.sync.data.remote.api.SubmissionApi
-import com.jsac.sync.data.remote.dto.FormSubmissionRequest
-import com.jsac.sync.data.remote.dto.FormSubmissionModel
+import com.jsac.sync.data.remote.dto.GpsLocation
+import com.jsac.sync.data.remote.dto.SubmitFormRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 
 /**
- * FormSubmissionRepository
- *
- * Implements OFFLINE-FIRST pattern:
- * 1. Save form submission to local database FIRST
- * 2. Return success immediately to user
- * 3. Sync to backend when online (background)
- * 4. If sync fails, retry with exponential backoff
- *
- * This ensures users can fill and submit forms even without internet
+ * Repository for form submissions
+ * Implements offline-first pattern:
+ * 1. Save form locally
+ * 2. Return success immediately
+ * 3. Sync to server when online (handled by WorkManager)
  */
 class FormSubmissionRepository @Inject constructor(
     private val api: SubmissionApi,
     private val submissionDao: FormSubmissionDao,
-    private val syncQueueDao: SyncQueueDao,
+    private val mediaFileDao: MediaFileDao,
     private val gson: Gson
 ) {
 
     // ============================================
-    // OFFLINE-FIRST: Save submission locally
+    // SUBMIT FORM (OFFLINE-FIRST)
     // ============================================
 
     /**
-     * Submit a form - OFFLINE-FIRST approach
-     *
-     * Process:
-     * 1. Validate form data
-     * 2. Save to local database (PENDING status)
-     * 3. Add to sync queue for background sync
-     * 4. Return success immediately
-     * 5. Sync happens in background via WorkManager
+     * Submit a form - saves locally first, returns immediately
+     * Server sync happens later via WorkManager
      */
-    fun submitForm(
+    suspend fun submitForm(
         formId: String,
-        formData: Map<String, Any>,
-        gpsLocation: Map<String, Double>? = null
-    ): Flow<Result<FormSubmissionModel>> = flow {
-        try {
-            Log.d("FormSubmissionRepo", "💾 Saving form submission locally: $formId")
+        formData: Map<String, String>,
+        gpsLocation: GpsLocation? = null
+    ): Result<Int> = try {
+        Log.d("FormSubmissionRepository", "📝 Submitting form: $formId")
 
-            // 1. Create entity for database
-            val entity = FormSubmissionEntity(
-                form_id = formId,
-                form_data = gson.toJson(formData),
-                sync_status = SyncStatus.PENDING,
-                created_at = System.currentTimeMillis(),
-                updated_at = System.currentTimeMillis()
-            )
+        val submission = FormSubmissionEntity(
+            form_id = formId,
+            form_data = gson.toJson(formData),
+            sync_status = SyncStatus.PENDING,
+            created_at = System.currentTimeMillis(),
+            updated_at = System.currentTimeMillis()
+        )
 
-            // 2. Insert into database
-            val submissionId = submissionDao.insertSubmission(entity).toInt()
-            Log.d("FormSubmissionRepo", "✅ Form saved locally with ID: $submissionId")
+        val submissionId = submissionDao.insertSubmission(submission).toInt()
 
-            // 3. Add to sync queue for background sync
-            val queueItem = SyncQueueEntity(
-                submission_id = submissionId,
-                operation_type = OperationType.CREATE,
-                status = "PENDING",
-                created_at = System.currentTimeMillis(),
-                next_retry_time = System.currentTimeMillis()  // Sync immediately when online
-            )
-            syncQueueDao.insertQueueItem(queueItem)
-            Log.d("FormSubmissionRepo", "📋 Added to sync queue: $submissionId")
+        Log.d("FormSubmissionRepository", "✅ Form saved locally - ID: $submissionId")
 
-            // 4. Return success immediately (offline-first!)
-            val model = FormSubmissionModel(
-                id = submissionId,
-                formId = formId,
-                formData = formData,
-                syncStatus = SyncStatus.PENDING,
-                createdAt = System.currentTimeMillis()
-            )
+        Result.success(submissionId)
 
-            emit(Result.success(model))
-            Log.d("FormSubmissionRepo", "✨ Form submission complete (pending sync)")
-
-        } catch (e: Exception) {
-            Log.e("FormSubmissionRepo", "❌ Error submitting form: ${e.message}", e)
-            emit(Result.failure(e))
-        }
+    } catch (e: Exception) {
+        Log.e("FormSubmissionRepository", "❌ Error submitting form: ${e.message}", e)
+        Result.failure(e)
     }
 
     // ============================================
-    // BACKGROUND SYNC: Upload to server
+    // ADD MEDIA FILE TO SUBMISSION
     // ============================================
 
     /**
-     * Sync a single submission to backend
-     * Called by WorkManager in background
+     * Add a media file (photo/document) to a submission
      */
-    suspend fun syncSubmissionToServer(submissionId: Int): Result<String> {
+    suspend fun addMediaFile(
+        submissionId: Int,
+        fieldId: String,
+        localPath: String,
+        fileName: String,
+        fileSize: Long,
+        fileType: String
+    ): Result<Int> = try {
+        Log.d("FormSubmissionRepository", "📸 Adding media file: $fileName")
+
+        val mediaFile = MediaFileEntity(
+            submission_id = submissionId,
+            field_id = fieldId,
+            local_path = localPath,
+            file_name = fileName,
+            file_size = fileSize,
+            file_type = fileType,
+            upload_status = UploadStatus.LOCAL,
+            created_at = System.currentTimeMillis()
+        )
+
+        val mediaId = mediaFileDao.insertMediaFile(mediaFile).toInt()
+
+        Log.d("FormSubmissionRepository", "✅ Media file saved - ID: $mediaId")
+
+        Result.success(mediaId)
+
+    } catch (e: Exception) {
+        Log.e("FormSubmissionRepository", "❌ Error adding media file: ${e.message}", e)
+        Result.failure(e)
+    }
+
+    // ============================================
+    // GET SUBMISSIONS
+    // ============================================
+
+    /**
+     * Get a specific submission from local DB
+     */
+    fun getSubmissionById(submissionId: Int): Flow<FormSubmissionEntity?> =
+        submissionDao.getSubmissionById(submissionId)
+
+    /**
+     * Get all submissions for a form
+     */
+    fun getSubmissionsByFormId(formId: String): Flow<List<FormSubmissionEntity>> =
+        submissionDao.getSubmissionsByFormId(formId)
+
+    /**
+     * Get submissions by sync status
+     */
+    fun getSubmissionsByStatus(status: String): Flow<List<FormSubmissionEntity>> =
+        submissionDao.getSubmissionsByStatus(status)
+
+    /**
+     * Get all pending submissions for sync
+     */
+    suspend fun getPendingSyncSubmissions(limit: Int = 50): List<FormSubmissionEntity> =
+        submissionDao.getPendingSyncSubmissions(limit)
+
+    /**
+     * Count submissions by status
+     * Used for showing badge counts in UI
+     */
+    suspend fun countByStatus(status: String): Int =
+        submissionDao.countByStatus(status)
+
+    // ============================================
+    // GET MEDIA FILES
+    // ============================================
+
+    /**
+     * Get all media files for a submission
+     */
+    fun getMediaFilesBySubmissionId(submissionId: Int): Flow<List<MediaFileEntity>> =
+        mediaFileDao.getMediaFilesBySubmissionId(submissionId)
+
+    /**
+     * Get pending upload files
+     */
+    suspend fun getPendingUploadFiles(limit: Int = 20): List<MediaFileEntity> =
+        mediaFileDao.getPendingUploadFiles(limit)
+
+    /**
+     * Update a media file (public wrapper for worker access)
+     */
+    suspend fun updateMediaFile(mediaFile: MediaFileEntity) {
+        mediaFileDao.updateMediaFile(mediaFile)
+    }
+
+    // ============================================
+    // SYNC OPERATIONS (Called by WorkManager)
+    // ============================================
+
+    /**
+     * Sync a submission to the server
+     * Called by background sync worker
+     */
+    suspend fun syncSubmissionToServer(
+        submissionId: Int,
+        gpsLocation: GpsLocation? = null
+    ): Result<String> {
         return try {
-            Log.d("FormSubmissionRepo", "🔄 Syncing submission: $submissionId")
+            val submission = getSubmissionByIdOnce(submissionId)
+                ?: return Result.failure(Exception("Submission not found"))
 
-            // 1. Get submission from local database
-            val submission = submissionDao.getSubmissionById(submissionId)
-                .let { flow ->
-                    var result: FormSubmissionEntity? = null
-                    flow.collect { result = it }
-                    result
-                }
-
-            if (submission == null) {
-                Log.e("FormSubmissionRepo", "❌ Submission not found: $submissionId")
-                return Result.failure(Exception("Submission not found"))
-            }
-
-            // 2. Mark as SYNCING
+            // Mark as syncing
             submissionDao.updateSubmissionStatus(submissionId, SyncStatus.SYNCING)
 
-            // 3. Prepare request
-            val formData = gson.fromJson(submission.form_data, Map::class.java)
-            val request = FormSubmissionRequest(
+            // Parse form data
+            val formData: Map<String, String> = try {
+                gson.fromJson(submission.form_data, Map::class.java) as Map<String, String>
+            } catch (e: Exception) {
+                Log.e("FormSubmissionRepository", "Error parsing form data: ${e.message}")
+                emptyMap()
+            }
+
+            // Create request
+            val request = SubmitFormRequest(
                 formId = submission.form_id,
-                formData = formData as Map<String, Any>,
-                submittedAt = submission.created_at
+                formData = formData,
+                submittedAt = submission.created_at,
+                gpsLocation = gpsLocation
             )
 
-            // 4. Send to backend
+            // Send to server
             val response = api.submitForm(request)
 
             if (response.isSuccessful && response.body() != null) {
-                // 5. Mark as SYNCED
+                val submissionIdFromServer = response.body()!!.submissionId
+
+                // Mark as synced
                 submissionDao.markAsSynced(submissionId)
 
-                // 6. Remove from sync queue
-                val queueItems = syncQueueDao.getQueueItemsBySubmissionId(submissionId)
-                    .let { flow ->
-                        var result: List<SyncQueueEntity>? = null
-                        flow.collect { result = it }
-                        result
-                    } ?: emptyList()
+                Log.d("FormSubmissionRepository", "✅ Submission synced: $submissionIdFromServer")
 
-                queueItems.forEach { item ->
-                    syncQueueDao.markAsSynced(item.id)
-                }
-
-                Log.d("FormSubmissionRepo", "✅ Submission synced successfully: $submissionId")
-                Result.success(response.body()!!.submissionId)
+                Result.success(submissionIdFromServer)
 
             } else {
-                // Sync failed - will retry
-                val errorMsg = response.errorBody()?.string() ?: "Unknown error"
+                val errorMsg = "HTTP ${response.code()}: ${response.message()}"
                 submissionDao.markAsFailed(submissionId, errorMsg)
-                Log.e("FormSubmissionRepo", "❌ Sync failed: $errorMsg")
+
+                Log.e("FormSubmissionRepository", "❌ Sync failed: $errorMsg")
+
                 Result.failure(Exception(errorMsg))
             }
 
         } catch (e: Exception) {
-            Log.e("FormSubmissionRepo", "❌ Sync exception: ${e.message}", e)
+            Log.e("FormSubmissionRepository", "❌ Exception during sync: ${e.message}", e)
             submissionDao.markAsFailed(submissionId, e.message ?: "Unknown error")
             Result.failure(e)
         }
     }
 
     // ============================================
-    // READ OPERATIONS: Get submissions
+    // UPDATE OPERATIONS
     // ============================================
 
     /**
-     * Get all submissions for a form
+     * Update submission sync status
      */
-    fun getSubmissionsByForm(formId: String): Flow<List<FormSubmissionModel>> = flow {
-        submissionDao.getSubmissionsByFormId(formId).collect { entities ->
-            val models = entities.map { entity ->
-                FormSubmissionModel(
-                    id = entity.id,
-                    formId = entity.form_id,
-                    formData = gson.fromJson(entity.form_data, Map::class.java) as Map<String, Any>,
-                    syncStatus = entity.sync_status,
-                    createdAt = entity.created_at,
-                    syncedAt = entity.synced_at,
-                    errorMessage = entity.error_message,
-                    retryCount = entity.retry_count
-                )
-            }
-            emit(models)
-        }
+    suspend fun updateSubmissionStatus(submissionId: Int, status: String) {
+        submissionDao.updateSubmissionStatus(submissionId, status)
     }
 
     /**
-     * Get submissions by sync status (PENDING, SYNCED, FAILED)
+     * Mark media file as uploaded
      */
-    fun getSubmissionsByStatus(status: String): Flow<List<FormSubmissionModel>> = flow {
-        submissionDao.getSubmissionsByStatus(status).collect { entities ->
-            val models = entities.map { entity ->
-                FormSubmissionModel(
-                    id = entity.id,
-                    formId = entity.form_id,
-                    formData = gson.fromJson(entity.form_data, Map::class.java) as Map<String, Any>,
-                    syncStatus = entity.sync_status,
-                    createdAt = entity.created_at,
-                    syncedAt = entity.synced_at,
-                    errorMessage = entity.error_message,
-                    retryCount = entity.retry_count
-                )
-            }
-            emit(models)
-        }
+    suspend fun markMediaAsUploaded(mediaId: Int, serverUrl: String) {
+        mediaFileDao.markAsUploaded(mediaId, serverUrl)
     }
 
     /**
-     * Get single submission
+     * Delete a submission (and its media files via cascade)
      */
-    fun getSubmissionById(submissionId: Int): Flow<FormSubmissionModel?> = flow {
-        submissionDao.getSubmissionById(submissionId).collect { entity ->
-            val model = entity?.let {
-                FormSubmissionModel(
-                    id = it.id,
-                    formId = it.form_id,
-                    formData = gson.fromJson(it.form_data, Map::class.java) as Map<String, Any>,
-                    syncStatus = it.sync_status,
-                    createdAt = it.created_at,
-                    syncedAt = it.synced_at,
-                    errorMessage = it.error_message,
-                    retryCount = it.retry_count
-                )
-            }
-            emit(model)
-        }
-    }
-
-    /**
-     * Get count of pending submissions (not yet synced)
-     */
-    fun getPendingSubmissionCount(): Flow<Int> = flow {
-        submissionDao.getSubmissionCountForForm("").collect { count ->
-            // Count all submissions with PENDING or FAILED status
-            val pending = submissionDao.countByStatus(SyncStatus.PENDING)
-            val failed = submissionDao.countByStatus(SyncStatus.FAILED)
-            emit(pending + failed)
-        }
+    suspend fun deleteSubmission(submissionId: Int) {
+        submissionDao.deleteSubmissionById(submissionId)
     }
 
     // ============================================
-    // SYNC STATISTICS
+    // HELPER
     // ============================================
 
     /**
-     * Get sync statistics
+     * Get submission by ID (non-Flow version for internal use)
+     * Uses block body to properly handle the Flow collection
      */
-    suspend fun getSyncStats(): SyncStats {
-        val pending = submissionDao.countByStatus(SyncStatus.PENDING)
-        val syncing = submissionDao.countByStatus(SyncStatus.SYNCING)
-        val synced = submissionDao.countByStatus(SyncStatus.SYNCED)
-        val failed = submissionDao.countByStatus(SyncStatus.FAILED)
-
-        return SyncStats(
-            pending = pending,
-            syncing = syncing,
-            synced = synced,
-            failed = failed,
-            total = pending + syncing + synced + failed
-        )
+    private suspend fun getSubmissionByIdOnce(submissionId: Int): FormSubmissionEntity? {
+        var result: FormSubmissionEntity? = null
+        submissionDao.getSubmissionById(submissionId).collect { result = it }
+        return result
     }
-
-    /**
-     * Manual retry for failed submissions
-     */
-    suspend fun retryFailedSubmissions(): Result<Int> {
-        return try {
-            val failed = submissionDao.getSubmissionsByStatusOnce(SyncStatus.FAILED)
-            var successCount = 0
-
-            for (submission in failed) {
-                val result = syncSubmissionToServer(submission.id)
-                if (result.isSuccess) {
-                    successCount++
-                }
-            }
-
-            Log.d("FormSubmissionRepo", "✅ Retried $successCount/${failed.size} submissions")
-            Result.success(successCount)
-
-        } catch (e: Exception) {
-            Log.e("FormSubmissionRepo", "❌ Retry error: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
-    // ============================================
-    // CLEANUP
-    // ============================================
-
-    /**
-     * Delete old synced submissions (keep last 30 days)
-     */
-    suspend fun cleanupOldSubmissions(daysOld: Int = 30) {
-        val cutoffTime = System.currentTimeMillis() - (daysOld * 24 * 60 * 60 * 1000)
-        submissionDao.deleteSyncedBefore(cutoffTime)
-        Log.d("FormSubmissionRepo", "🗑️ Cleaned up submissions older than $daysOld days")
-    }
-}
-
-/**
- * Data class for sync statistics
- */
-data class SyncStats(
-    val pending: Int = 0,
-    val syncing: Int = 0,
-    val synced: Int = 0,
-    val failed: Int = 0,
-    val total: Int = 0
-) {
-    val percentSynced: Float
-        get() = if (total > 0) (synced.toFloat() / total) * 100 else 0f
 }

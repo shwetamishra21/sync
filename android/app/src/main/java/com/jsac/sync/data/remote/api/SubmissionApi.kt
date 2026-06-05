@@ -1,8 +1,9 @@
 package com.jsac.sync.data.remote.api
 
-import com.jsac.sync.data.remote.dto.FormSubmissionRequest
-import com.jsac.sync.data.remote.dto.FormSubmissionResponse
-import com.jsac.sync.data.remote.dto.FormSubmissionDetailResponse
+import com.jsac.sync.data.remote.dto.SubmitFormRequest
+import com.jsac.sync.data.remote.dto.SubmitFormResponse
+import com.jsac.sync.data.remote.dto.SubmissionDetailResponse
+import com.jsac.sync.data.remote.dto.SubmissionsListResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -10,47 +11,47 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 
 /**
- * API interface for form submission endpoints
- *
- * Handles:
- * - Submitting completed forms
- * - Retrieving submission details
- * - Batch operations
+ * Retrofit API interface for form submission endpoints
+ * All endpoints require JWT authentication via AuthInterceptor
  */
 interface SubmissionApi {
 
     /**
-     * Submit a completed form to the backend
+     * Submit a completed form to the server
      *
-     * @param request Form data to submit
-     * @return Server-generated submission ID
+     * POST /forms/submit
+     * Headers: Authorization: Bearer <JWT_TOKEN>
+     *
+     * Response: SubmitFormResponse (201 Created)
      */
     @POST("forms/submit")
     suspend fun submitForm(
-        @Body request: FormSubmissionRequest
-    ): Response<FormSubmissionResponse>
+        @Body request: SubmitFormRequest
+    ): Response<SubmitFormResponse>
 
     /**
-     * Get details of a previously submitted form
+     * Get details of a specific submission
      *
-     * @param submissionId Server submission ID
-     * @return Form submission details
+     * GET /submissions/{submission_id}
+     * Headers: Authorization: Bearer <JWT_TOKEN>
+     *
+     * Response: SubmissionDetailResponse (200 OK)
      */
     @GET("submissions/{submission_id}")
     suspend fun getSubmission(
         @Path("submission_id") submissionId: String
-    ): Response<FormSubmissionDetailResponse>
+    ): Response<SubmissionDetailResponse>
 
     /**
-     * Get all submissions for a specific form (with pagination)
+     * Get all submissions for a specific form
      *
-     * @param formId Form ID to filter by
-     * @param page Page number (0-indexed)
-     * @param limit Results per page
-     * @return List of submissions
+     * GET /forms/{form_id}/submissions
+     * Headers: Authorization: Bearer <JWT_TOKEN>
+     *
+     * Response: SubmissionsListResponse (200 OK)
      */
     @GET("forms/{form_id}/submissions")
-    suspend fun getFormSubmissions(
+    suspend fun getSubmissions(
         @Path("form_id") formId: String
-    ): Response<FormSubmissionDetailResponse>
+    ): Response<SubmissionsListResponse>
 }

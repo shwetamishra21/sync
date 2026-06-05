@@ -7,4 +7,10 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Sync Status Colors -->
+    <color name="sync_status_background">#1e1e1e</color>
+    <color name="sync_success_color">#FF4CAF50</color>
+    <color name="sync_button_color">#FF2196F3</color>
+    <color name="logout_button_color">#FFF44336</color>
 </resources>

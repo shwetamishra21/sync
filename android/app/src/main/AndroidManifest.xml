@@ -2,29 +2,39 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- INTERNET -->
+    <!-- ============================================ -->
+    <!-- INTERNET & NETWORK -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- NETWORK STATE -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- LOCATION -->
+    <!-- ============================================ -->
+    <!-- LOCATION SERVICES -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- CAMERA -->
+    <!-- ============================================ -->
+    <!-- CAMERA (Optional - if needed for photo capture) -->
+    <!-- ============================================ -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
 
-    <!-- STORAGE (Android 12 and below) -->
+    <!-- ============================================ -->
+    <!-- STORAGE -->
+    <!-- Android 12 and below: READ_EXTERNAL_STORAGE -->
+    <!-- Android 13+: READ_MEDIA_IMAGES -->
+    <!-- ============================================ -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
-    <!-- STORAGE (Android 13+) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
+    <!-- ============================================ -->
+    <!-- APPLICATION CONFIGURATION -->
+    <!-- ============================================ -->
     <application
         android:name=".SyncApplication"
         android:allowBackup="true"
@@ -38,6 +48,9 @@
         android:theme="@style/Theme.Sync"
         tools:targetApi="31">
 
+        <!-- ============================================ -->
+        <!-- MAIN ACTIVITY -->
+        <!-- ============================================ -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -46,7 +59,6 @@
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 

@@ -4,16 +4,40 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.jsac.sync.R
+import com.jsac.sync.presentation.sync.SyncStatusViewModel
+import com.jsac.sync.worker.SyncScheduler
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
+/**
+ * Updated Home Fragment with automatic sync
+ *
+ * Features:
+ * - Triggers form/media sync when user opens app
+ * - Shows pending items count
+ * - Shows sync status
+ * - Manual sync button
+ */
 @AndroidEntryPoint
 class HomeFragment : Fragment(R.layout.fragment_home) {
 
     private val viewModel: HomeViewModel by viewModels()
+    private val syncStatusViewModel: SyncStatusViewModel by viewModels()
+
+    // UI Components
+    private lateinit var tvPendingCount: TextView
+    private lateinit var tvSyncStatus: TextView
+    private lateinit var progressBarSync: ProgressBar
+    private lateinit var btnManualSync: Button
+    private lateinit var btnViewForms: Button
+    private lateinit var btnLogout: Button
 
     override fun onViewCreated(
         view: View,
@@ -23,45 +47,102 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
         Log.d("HomeFragment", "🏠 Home screen loaded")
 
-        try {
-            val btnViewForms = view.findViewById<Button>(R.id.btnViewForms)
-            if (btnViewForms != null) {
-                btnViewForms.setOnClickListener {
-                    Log.d("HomeFragment", "📋 Navigate to dashboard")
-                    try {
-                        findNavController().navigate(R.id.action_home_to_dashboard)
-                    } catch (e: Exception) {
-                        Log.e("HomeFragment", "❌ Navigation error: ${e.message}", e)
-                    }
-                }
-            } else {
-                Log.w("HomeFragment", "⚠️ btnViewForms not found in layout")
+        // Find views
+        tvPendingCount = view.findViewById(R.id.tvPendingCount)
+        tvSyncStatus = view.findViewById(R.id.tvSyncStatus)
+        progressBarSync = view.findViewById(R.id.progressBarSync)
+        btnManualSync = view.findViewById(R.id.btnManualSync)
+        btnViewForms = view.findViewById(R.id.btnViewForms)
+        btnLogout = view.findViewById(R.id.btnLogout)
+
+        // ============================================
+        // AUTOMATIC SYNC ON OPEN
+        // ============================================
+
+        Log.d("HomeFragment", "🔄 Triggering automatic sync...")
+        SyncScheduler.syncAll(requireContext())
+
+        // ============================================
+        // OBSERVE SYNC STATUS
+        // ============================================
+
+        lifecycleScope.launch {
+            syncStatusViewModel.syncStatus.collect { status ->
+                updateSyncUI(status)
             }
-        } catch (e: Exception) {
-            Log.e("HomeFragment", "❌ Error finding btnViewForms: ${e.message}", e)
         }
 
-        try {
-            val btnLogout = view.findViewById<Button>(R.id.btnLogout)
-            if (btnLogout != null) {
-                btnLogout.setOnClickListener {
-                    Log.d("HomeFragment", "🚪 Logout button clicked")
-                    viewModel.logout()
+        // ============================================
+        // BUTTON LISTENERS
+        // ============================================
 
-                    try {
-                        findNavController().navigate(
-                            R.id.action_home_to_login
-                        )
-                        Log.d("HomeFragment", "✅ Navigated to Login after logout")
-                    } catch (e: Exception) {
-                        Log.e("HomeFragment", "❌ Navigation error: ${e.message}", e)
-                    }
-                }
-            } else {
-                Log.w("HomeFragment", "⚠️ btnLogout not found in layout")
+        btnViewForms.setOnClickListener {
+            Log.d("HomeFragment", "📋 Navigate to dashboard")
+            try {
+                findNavController().navigate(R.id.action_home_to_dashboard)
+            } catch (e: Exception) {
+                Log.e("HomeFragment", "❌ Navigation error: ${e.message}", e)
             }
-        } catch (e: Exception) {
-            Log.e("HomeFragment", "❌ Error finding btnLogout: ${e.message}", e)
         }
+
+        btnManualSync.setOnClickListener {
+            Log.d("HomeFragment", "🚀 Manual sync triggered")
+            syncStatusViewModel.triggerSync(requireContext())
+        }
+
+        btnLogout.setOnClickListener {
+            Log.d("HomeFragment", "🚪 Logout button clicked")
+            viewModel.logout()
+
+            try {
+                findNavController().navigate(R.id.action_home_to_login)
+                Log.d("HomeFragment", "✅ Navigated to Login after logout")
+            } catch (e: Exception) {
+                Log.e("HomeFragment", "❌ Navigation error: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * Update UI based on sync status
+     */
+    private fun updateSyncUI(status: SyncStatusViewModel.SyncStatus) {
+        Log.d("HomeFragment", "📊 Updating sync UI")
+
+        // Show pending count
+        if (status.pendingFormCount > 0 || status.pendingMediaCount > 0) {
+            tvPendingCount.visibility = View.VISIBLE
+            tvPendingCount.text = buildString {
+                if (status.pendingFormCount > 0) {
+                    append("📋 ${status.pendingFormCount} pending form(s)")
+                }
+                if (status.pendingMediaCount > 0) {
+                    if (status.pendingFormCount > 0) append("\n")
+                    append("📸 ${status.pendingMediaCount} pending media file(s)")
+                }
+            }
+        } else {
+            tvPendingCount.visibility = View.GONE
+        }
+
+        // Show sync status
+        tvSyncStatus.text = status.message
+
+        // Show/hide progress bar
+        if (status.isSyncing) {
+            progressBarSync.visibility = View.VISIBLE
+            btnManualSync.isEnabled = false
+            btnManualSync.alpha = 0.5f
+        } else {
+            progressBarSync.visibility = View.GONE
+            btnManualSync.isEnabled = true
+            btnManualSync.alpha = 1.0f
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.d("HomeFragment", "👀 onResume - Checking sync status")
+        syncStatusViewModel.refreshStatus()
     }
 }
