@@ -1,5 +1,5 @@
 import os
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 import jwt
@@ -9,6 +9,9 @@ import secrets
 from dotenv import load_dotenv
 from database.db import db
 from models.user_model import User
+from models.form_model import Form
+from models.field_model import Field
+import json
 
 app = Flask(__name__)
 load_dotenv()
@@ -21,6 +24,7 @@ db.init_app(app)
 # Verify Database Connection
 with app.app_context():
     try:
+        db.create_all()  # Create all tables
         db.engine.connect()
         print("\n" + "="*50)
         print("✓ POSTGRESQL CONNECTED SUCCESSFULLY")
@@ -39,110 +43,6 @@ app.config["SECRET_KEY"] = "jsac_secret_key"
 
 # Store reset tokens (use database in production)
 reset_tokens = {}
-
-# ============================================
-# FORM TEMPLATES DATABASE
-# ============================================
-
-forms_db = [
-    {
-        "id": "form_001",
-        "name": "Citizen Service Request",
-        "description": "Request government services",
-        "version": "1.0",
-        "created_at": "2026-01-01",
-        "fields": [
-            {
-                "id": "field_001",
-                "name": "Full Name",
-                "type": "text",
-                "required": True,
-                "placeholder": "Enter your full name"
-            },
-            {
-                "id": "field_002",
-                "name": "Email",
-                "type": "email",
-                "required": True,
-                "placeholder": "Enter your email"
-            },
-            {
-                "id": "field_003",
-                "name": "Service Type",
-                "type": "dropdown",
-                "required": True,
-                "options": ["Birth Certificate", "License", "Permit", "Other"]
-            },
-            {
-                "id": "field_004",
-                "name": "Description",
-                "type": "textarea",
-                "required": False,
-                "placeholder": "Describe your request"
-            }
-        ]
-    },
-    {
-        "id": "form_002",
-        "name": "Property Registration",
-        "description": "Register property with government",
-        "version": "1.0",
-        "created_at": "2026-01-02",
-        "fields": [
-            {
-                "id": "field_101",
-                "name": "Property Address",
-                "type": "text",
-                "required": True,
-                "placeholder": "Enter property address"
-            },
-            {
-                "id": "field_102",
-                "name": "Property Type",
-                "type": "dropdown",
-                "required": True,
-                "options": ["Residential", "Commercial", "Agricultural"]
-            },
-            {
-                "id": "field_103",
-                "name": "Area (sq ft)",
-                "type": "number",
-                "required": True,
-                "placeholder": "Enter area"
-            }
-        ]
-    },
-    {
-        "id": "form_003",
-        "name": "Business License Application",
-        "description": "Apply for a business license",
-        "version": "1.0",
-        "created_at": "2026-01-03",
-        "fields": [
-            {
-                "id": "field_201",
-                "name": "Business Name",
-                "type": "text",
-                "required": True,
-                "placeholder": "Enter business name"
-            },
-            {
-                "id": "field_202",
-                "name": "Business Type",
-                "type": "dropdown",
-                "required": True,
-                "options": ["Retail", "Service", "Manufacturing", "Technology"]
-            },
-            {
-                "id": "field_203",
-                "name": "Owner Email",
-                "type": "email",
-                "required": True,
-                "placeholder": "owner@business.com"
-            }
-        ]
-    }
-]
 
 
 # ============================================
@@ -426,25 +326,21 @@ def check_reset_token():
 
 
 # ============================================
-# FORM ENDPOINTS
+# FORM ENDPOINTS (DATABASE-DRIVEN)
 # ============================================
 
 @app.route("/forms", methods=["GET"])
 def get_forms():
+    """
+    Get list of all active forms
+    Returns form metadata without field details
+    """
     print("\n[FORMS] GET /forms called")
     
     try:
-        form_list = [
-            {
-                "id": form["id"],
-                "name": form["name"],
-                "description": form["description"],
-                "version": form["version"],
-                "created_at": form["created_at"],
-                "field_count": len(form["fields"])
-            }
-            for form in forms_db
-        ]
+        forms = Form.query.filter_by(is_active=True).all()
+        
+        form_list = [form.to_dict() for form in forms]
         
         print(f"[FORMS] Returning {len(form_list)} forms")
         
@@ -461,14 +357,13 @@ def get_forms():
 
 @app.route("/forms/<form_id>", methods=["GET"])
 def get_form_detail(form_id):
+    """
+    Get complete form with all fields
+    """
     print(f"\n[FORMS] GET /forms/{form_id} called")
     
     try:
-        form = None
-        for f in forms_db:
-            if f["id"] == form_id:
-                form = f
-                break
+        form = Form.query.filter_by(id=form_id, is_active=True).first()
         
         if not form:
             print(f"[FORMS] Form {form_id} not found")
@@ -476,15 +371,267 @@ def get_form_detail(form_id):
                 "message": f"Form {form_id} not found"
             }, 404
         
-        print(f"[FORMS] Form {form_id} found with {len(form['fields'])} fields")
+        print(f"[FORMS] Form {form_id} found with {len(form.fields)} fields")
         
         return {
             "status": "success",
-            "form": form
+            "form": form.to_dict_with_fields()
         }, 200
     
     except Exception as e:
         print(f"[FORMS] Error in get_form_detail: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
+
+
+# ============================================
+# ADMIN ENDPOINTS - FORM MANAGEMENT
+# ============================================
+
+@app.route("/admin/forms", methods=["POST"])
+def create_form():
+    """
+    Create a new form (ADMIN ONLY)
+    
+    Request body:
+    {
+        "id": "form_001",
+        "name": "Form Name",
+        "description": "Form description",
+        "version": "1.0"
+    }
+    """
+    print("\n[ADMIN] POST /admin/forms called")
+    
+    try:
+        data = request.get_json()
+        
+        required_fields = ["id", "name"]
+        if not all(field in data for field in required_fields):
+            return {"message": "Missing required fields: id, name"}, 400
+        
+        existing_form = Form.query.filter_by(id=data["id"]).first()
+        if existing_form:
+            return {"message": f"Form with id {data['id']} already exists"}, 400
+        
+        new_form = Form(
+            id=data["id"],
+            name=data["name"],
+            description=data.get("description", ""),
+            version=data.get("version", "1.0")
+        )
+        
+        db.session.add(new_form)
+        db.session.commit()
+        
+        print(f"[ADMIN] Form {data['id']} created successfully")
+        
+        return {
+            "message": "Form created successfully",
+            "form": new_form.to_dict()
+        }, 201
+    
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ADMIN] Error in create_form: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
+
+
+@app.route("/admin/forms/<form_id>", methods=["PUT"])
+def update_form(form_id):
+    """
+    Update form metadata (ADMIN ONLY)
+    """
+    print(f"\n[ADMIN] PUT /admin/forms/{form_id} called")
+    
+    try:
+        form = Form.query.filter_by(id=form_id).first()
+        
+        if not form:
+            return {"message": f"Form {form_id} not found"}, 404
+        
+        data = request.get_json()
+        
+        if "name" in data:
+            form.name = data["name"]
+        if "description" in data:
+            form.description = data["description"]
+        if "version" in data:
+            form.version = data["version"]
+        if "is_active" in data:
+            form.is_active = data["is_active"]
+        
+        db.session.commit()
+        
+        print(f"[ADMIN] Form {form_id} updated successfully")
+        
+        return {
+            "message": "Form updated successfully",
+            "form": form.to_dict()
+        }, 200
+    
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ADMIN] Error in update_form: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
+
+
+@app.route("/admin/forms/<form_id>/fields", methods=["POST"])
+def add_field_to_form(form_id):
+    """
+    Add a field to a form (ADMIN ONLY)
+    
+    Request body:
+    {
+        "field_id": "field_001",
+        "name": "Full Name",
+        "type": "text",
+        "required": true,
+        "placeholder": "Enter your full name",
+        "field_order": 1,
+        "options": ["Option1", "Option2"],  // only for dropdown
+        "help_text": "This is your legal name"
+    }
+    """
+    print(f"\n[ADMIN] POST /admin/forms/{form_id}/fields called")
+    
+    try:
+        form = Form.query.filter_by(id=form_id).first()
+        
+        if not form:
+            return {"message": f"Form {form_id} not found"}, 404
+        
+        data = request.get_json()
+        
+        required_fields = ["field_id", "name", "type"]
+        if not all(field in data for field in required_fields):
+            return {"message": "Missing required fields: field_id, name, type"}, 400
+        
+        new_field = Field(
+            form_id=form_id,
+            field_id=data["field_id"],
+            name=data["name"],
+            type=data["type"],
+            required=data.get("required", False),
+            placeholder=data.get("placeholder"),
+            field_order=data.get("field_order", 0),
+            help_text=data.get("help_text")
+        )
+        
+        # Handle dropdown options
+        if data["type"] in ["dropdown", "select"]:
+            if "options" in data:
+                new_field.set_options(data["options"])
+        
+        db.session.add(new_field)
+        db.session.commit()
+        
+        print(f"[ADMIN] Field {data['field_id']} added to form {form_id}")
+        
+        return {
+            "message": "Field added successfully",
+            "field": new_field.to_dict()
+        }, 201
+    
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ADMIN] Error in add_field_to_form: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
+
+
+@app.route("/admin/forms/<form_id>/fields/<int:field_db_id>", methods=["PUT"])
+def update_field(form_id, field_db_id):
+    """
+    Update a field in a form (ADMIN ONLY)
+    """
+    print(f"\n[ADMIN] PUT /admin/forms/{form_id}/fields/{field_db_id} called")
+    
+    try:
+        field = Field.query.filter_by(id=field_db_id, form_id=form_id).first()
+        
+        if not field:
+            return {"message": f"Field not found"}, 404
+        
+        data = request.get_json()
+        
+        if "name" in data:
+            field.name = data["name"]
+        if "type" in data:
+            field.type = data["type"]
+        if "required" in data:
+            field.required = data["required"]
+        if "placeholder" in data:
+            field.placeholder = data["placeholder"]
+        if "field_order" in data:
+            field.field_order = data["field_order"]
+        if "help_text" in data:
+            field.help_text = data["help_text"]
+        if "options" in data:
+            field.set_options(data["options"])
+        
+        db.session.commit()
+        
+        print(f"[ADMIN] Field {field_db_id} updated successfully")
+        
+        return {
+            "message": "Field updated successfully",
+            "field": field.to_dict()
+        }, 200
+    
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ADMIN] Error in update_field: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
+
+
+@app.route("/admin/forms/<form_id>/fields/<int:field_db_id>", methods=["DELETE"])
+def delete_field(form_id, field_db_id):
+    """
+    Delete a field from a form (ADMIN ONLY)
+    """
+    print(f"\n[ADMIN] DELETE /admin/forms/{form_id}/fields/{field_db_id} called")
+    
+    try:
+        field = Field.query.filter_by(id=field_db_id, form_id=form_id).first()
+        
+        if not field:
+            return {"message": f"Field not found"}, 404
+        
+        db.session.delete(field)
+        db.session.commit()
+        
+        print(f"[ADMIN] Field {field_db_id} deleted successfully")
+        
+        return {"message": "Field deleted successfully"}, 200
+    
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ADMIN] Error in delete_field: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
+
+
+@app.route("/admin/forms/<form_id>", methods=["DELETE"])
+def delete_form(form_id):
+    """
+    Delete a form (ADMIN ONLY)
+    """
+    print(f"\n[ADMIN] DELETE /admin/forms/{form_id} called")
+    
+    try:
+        form = Form.query.filter_by(id=form_id).first()
+        
+        if not form:
+            return {"message": f"Form {form_id} not found"}, 404
+        
+        db.session.delete(form)
+        db.session.commit()
+        
+        print(f"[ADMIN] Form {form_id} deleted successfully")
+        
+        return {"message": "Form deleted successfully"}, 200
+    
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ADMIN] Error in delete_form: {str(e)}")
         return {"message": f"Error: {str(e)}"}, 500
 
 
