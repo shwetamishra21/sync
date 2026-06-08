@@ -8,6 +8,7 @@ import com.jsac.sync.data.remote.api.FormApi
 import com.jsac.sync.data.remote.dto.FormDetail
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 /**
@@ -46,13 +47,11 @@ class FormRepository @Inject constructor(
 
             // 1. Check cache first
             var cachedForms: List<FormEntity> = emptyList()
-            dao.getAllForms().collect { forms ->
-                if (forms.isNotEmpty()) {
-                    cachedForms = forms
-                    Log.d("FormRepository", "✅ Cached forms found: ${forms.size}")
-                    // Emit cached data immediately
-                    emit(Result.success(forms))
-                }
+            cachedForms = dao.getAllForms().first()
+
+            if (cachedForms.isNotEmpty()) {
+                Log.d("FormRepository", "✅ Cached forms found: ${cachedForms.size}")
+                emit(Result.success(cachedForms))
             }
 
             // 2. Fetch fresh data from API

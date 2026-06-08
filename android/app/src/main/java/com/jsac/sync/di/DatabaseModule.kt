@@ -5,6 +5,7 @@ import com.jsac.sync.data.local.db.AppDatabase
 import com.jsac.sync.data.local.db.dao.FormDao
 import com.jsac.sync.data.local.db.dao.FormSubmissionDao
 import com.jsac.sync.data.local.db.dao.MediaFileDao
+import com.jsac.sync.data.local.db.dao.SyncQueueDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,7 +38,7 @@ object DatabaseModule {
     }
 
     // ============================================
-    // FORM SUBMISSION DAO (New - Part 4 Step 1)
+    // FORM SUBMISSION DAO
     // ============================================
 
     @Provides
@@ -49,7 +50,7 @@ object DatabaseModule {
     }
 
     // ============================================
-    // MEDIA FILE DAO (New - Part 4 Step 1)
+    // MEDIA FILE DAO
     // ============================================
 
     @Provides
@@ -58,5 +59,17 @@ object DatabaseModule {
         database: AppDatabase
     ): MediaFileDao {
         return database.mediaFileDao()
+    }
+
+    // ============================================
+    // SYNC QUEUE DAO (NEW)
+    // ============================================
+
+    @Provides
+    @Singleton
+    fun provideSyncQueueDao(
+        database: AppDatabase
+    ): SyncQueueDao {
+        return database.syncQueueDao()
     }
 }

@@ -107,6 +107,7 @@ dependencies {
     // ============================================
     // ✅ REQUIRED: WorkManager for background sync
     implementation("androidx.work:work-runtime-ktx:2.8.1")
+    implementation ("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
     // ============================================
     // LOCATION SERVICES

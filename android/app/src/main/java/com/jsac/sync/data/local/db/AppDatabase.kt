@@ -9,10 +9,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.jsac.sync.data.local.db.dao.FormDao
 import com.jsac.sync.data.local.db.dao.FormSubmissionDao
 import com.jsac.sync.data.local.db.dao.MediaFileDao
+import com.jsac.sync.data.local.db.dao.SyncQueueDao
 import com.jsac.sync.data.local.db.entity.FormEntity
 import com.jsac.sync.data.local.db.entity.FormFieldEntity
 import com.jsac.sync.data.local.db.entity.FormSubmissionEntity
 import com.jsac.sync.data.local.db.entity.MediaFileEntity
+import com.jsac.sync.data.local.db.entity.SyncQueueEntity
 
 /**
  * Room Database for JSAC Sync
@@ -22,24 +24,27 @@ import com.jsac.sync.data.local.db.entity.MediaFileEntity
  * - form_fields: Form field definitions
  * - form_submissions: User-submitted form data
  * - media_files: Photos and documents
+ * - sync_queue: Sync queue for retrying failed operations
  *
- * Version 2: Added form submissions and media files for offline support
+ * Version 3: Added sync_queue table
  */
 @Database(
     entities = [
         FormEntity::class,
         FormFieldEntity::class,
         FormSubmissionEntity::class,
-        MediaFileEntity::class
+        MediaFileEntity::class,
+        SyncQueueEntity::class
     ],
-    version = 2,
-    exportSchema = false  // ✅ FIXED: Set to false for development
+    version = 3,
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun formDao(): FormDao
     abstract fun formSubmissionDao(): FormSubmissionDao
     abstract fun mediaFileDao(): MediaFileDao
+    abstract fun syncQueueDao(): SyncQueueDao
 
     companion object {
         @Volatile
@@ -59,7 +64,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "jsac_sync_db"
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
         }
@@ -126,6 +131,43 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_media_files_upload_status` ON `media_files` (`upload_status`)"
+                )
+            }
+        }
+
+        /**
+         * Migration from v2 to v3
+         * Adds: sync_queue table
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Create sync_queue table
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sync_queue` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `submission_id` INTEGER NOT NULL,
+                        `operation_type` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `retry_count` INTEGER NOT NULL DEFAULT 0,
+                        `max_retries` INTEGER NOT NULL DEFAULT 3,
+                        `created_at` INTEGER NOT NULL,
+                        `last_attempt_at` INTEGER,
+                        `next_retry_time` INTEGER NOT NULL,
+                        `error_message` TEXT
+                    )
+                    """.trimIndent()
+                )
+
+                // Create indexes for sync_queue
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sync_queue_status` ON `sync_queue` (`status`)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sync_queue_operation_type` ON `sync_queue` (`operation_type`)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_sync_queue_next_retry_time` ON `sync_queue` (`next_retry_time`)"
                 )
             }
         }

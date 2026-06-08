@@ -9,10 +9,7 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 
-/**
- * Hilt Module for providing repository instances
- * All repositories are automatically created and injected
- */
+
 @Module
 @InstallIn(SingletonComponent::class)
 object RepositoryModule {
