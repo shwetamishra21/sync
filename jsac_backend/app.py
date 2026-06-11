@@ -1,4 +1,5 @@
 import os
+from models.submission_model import FormSubmission
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
@@ -12,12 +13,15 @@ from models.user_model import User
 from models.form_model import Form
 from models.field_model import Field
 import json
+from functools import wraps
+import mimetypes
 
 app = Flask(__name__)
 load_dotenv()
 
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50MB max file size
 
 db.init_app(app)
 
@@ -43,6 +47,51 @@ app.config["SECRET_KEY"] = "jsac_secret_key"
 
 # Store reset tokens (use database in production)
 reset_tokens = {}
+
+# ============================================
+# MIDDLEWARE - JWT AUTHENTICATION
+# ============================================
+
+def token_required(f):
+    """
+    Decorator to verify JWT token on protected endpoints
+    Add @token_required above route to protect it
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        
+        # Check if token in headers
+        if 'Authorization' in request.headers:
+            auth_header = request.headers['Authorization']
+            try:
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                print("[AUTH] Invalid token format")
+                return {"message": "Invalid token format"}, 401
+        
+        if not token:
+            print("[AUTH] Token is missing")
+            return {"message": "Token is missing"}, 401
+        
+        try:
+            data = jwt.decode(
+                token,
+                app.config["SECRET_KEY"],
+                algorithms=["HS256"]
+            )
+            current_user = data.get("username")
+            print(f"[AUTH] Token verified for user: {current_user}")
+        except jwt.ExpiredSignatureError:
+            print("[AUTH] Token has expired")
+            return {"message": "Token has expired"}, 401
+        except jwt.InvalidTokenError:
+            print("[AUTH] Invalid token")
+            return {"message": "Invalid token"}, 401
+        
+        return f(current_user, *args, **kwargs)
+    
+    return decorated
 
 
 # ============================================
@@ -113,6 +162,7 @@ def register():
     
     except Exception as e:
         print(f"[AUTH] Error in register: {str(e)}")
+        db.session.rollback()
         return {"message": f"Error: {str(e)}"}, 500
 
 
@@ -276,6 +326,7 @@ def reset_password():
         return {"message": "Password reset successfully"}, 200
     
     except Exception as e:
+        db.session.rollback()
         print(f"[PASSWORD] Error in reset_password: {str(e)}")
         return {"message": f"Error: {str(e)}"}, 500
 
@@ -381,6 +432,227 @@ def get_form_detail(form_id):
     except Exception as e:
         print(f"[FORMS] Error in get_form_detail: {str(e)}")
         return {"message": f"Error: {str(e)}"}, 500
+@app.route("/forms/submit", methods=["POST"])
+@token_required
+def submit_form(current_user):
+    """
+    Submit a completed form
+    """
+    print(f"\n[SUBMISSION] POST /forms/submit called by {current_user}")
+
+    try:
+        data = request.get_json()
+
+        if not data:
+            print("[SUBMISSION] No data provided")
+            return {"message": "Request body is required"}, 400
+
+        form_id = data.get("form_id")
+        form_data = data.get("form_data")
+        submitted_at = data.get(
+            "submitted_at",
+            int(datetime.datetime.utcnow().timestamp() * 1000)
+        )
+
+        if not form_id or not form_data:
+            print("[SUBMISSION] Missing form_id or form_data")
+            return {
+                "message": "form_id and form_data are required"
+            }, 400
+
+        # Verify form exists
+        form = Form.query.filter_by(
+            id=form_id,
+            is_active=True
+        ).first()
+
+        if not form:
+            print(f"[SUBMISSION] Form {form_id} not found")
+            return {
+                "message": f"Form {form_id} not found"
+            }, 404
+
+        # Create submission record
+        submission = FormSubmission(
+            form_id=form_id,
+            sync_status="SYNCED",
+            created_at=datetime.datetime.utcfromtimestamp(
+                submitted_at / 1000
+            ) if submitted_at else datetime.datetime.utcnow(),
+            synced_at=datetime.datetime.utcnow()
+        )
+
+        # Store form data
+        submission.set_form_data(form_data)
+
+        # Store GPS location if provided
+        gps_location = data.get("gps_location")
+
+        if gps_location:
+            submission.gps_latitude = gps_location.get("lat")
+            submission.gps_longitude = gps_location.get("lng")
+
+        db.session.add(submission)
+        db.session.commit()
+
+        print(
+            f"[SUBMISSION] Form {form_id} submitted - "
+            f"ID: {submission.id}"
+        )
+
+        return {
+            "status": "success",
+            "submission_id": str(submission.id),
+            "message": "Form submitted successfully",
+            "submitted_at": submitted_at
+        }, 201
+
+    except Exception as e:
+        db.session.rollback()
+
+        print(
+            f"[SUBMISSION] Error in submit_form: {str(e)}",
+            exc_info=True
+        )
+
+        return {
+            "status": "error",
+            "message": f"Error: {str(e)}"
+        }, 500
+# ============================================
+# MEDIA UPLOAD ENDPOINT
+# ============================================
+
+@app.route("/media/upload", methods=["POST"])
+@token_required
+def upload_media(current_user):
+    """
+    Upload media file (photo/document)
+
+    Multipart form data:
+    - file
+    - submission_id
+    - field_id
+    """
+
+    print(f"\n[MEDIA] POST /media/upload called by {current_user}")
+
+    try:
+
+        if "file" not in request.files:
+            return {
+                "status": "error",
+                "message": "No file provided"
+            }, 400
+
+        file = request.files["file"]
+
+        submission_id = request.form.get("submission_id")
+        field_id = request.form.get("field_id")
+
+        if not submission_id:
+            return {
+                "status": "error",
+                "message": "submission_id is required"
+            }, 400
+
+        if not field_id:
+            return {
+                "status": "error",
+                "message": "field_id is required"
+            }, 400
+
+        if file.filename == "":
+            return {
+                "status": "error",
+                "message": "No file selected"
+            }, 400
+
+        # Create uploads directory
+        upload_dir = os.path.join(
+            os.path.dirname(__file__),
+            "uploads"
+        )
+
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # Generate unique filename
+        timestamp = int(
+            datetime.datetime.utcnow().timestamp() * 1000
+        )
+
+        original_extension = os.path.splitext(
+            file.filename
+        )[1]
+
+        unique_filename = (
+            f"{submission_id}_"
+            f"{field_id}_"
+            f"{timestamp}"
+            f"{original_extension}"
+        )
+
+        file_path = os.path.join(
+            upload_dir,
+            unique_filename
+        )
+
+        # Save file
+        file.save(file_path)
+
+        # Build URL
+        server_url = (
+            f"http://localhost:5000/uploads/"
+            f"{unique_filename}"
+        )
+
+        print(f"[MEDIA] Uploaded: {unique_filename}")
+
+        return {
+            "status": "success",
+            "message": "File uploaded successfully",
+            "file_name": unique_filename,
+            "server_url": server_url
+        }, 201
+
+    except Exception as e:
+        print(
+            f"[MEDIA] Error in upload_media: {str(e)}",
+            exc_info=True
+        )
+
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+# ============================================
+# SERVE UPLOADED FILES
+# ============================================
+
+@app.route("/uploads/<filename>", methods=["GET"])
+def download_file(filename):
+    """Serve uploaded files"""
+    print(f"\n[MEDIA] GET /uploads/{filename} called")
+    
+    try:
+        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads')
+        file_path = os.path.join(upload_dir, filename)
+        
+        # Security: Prevent directory traversal
+        if not os.path.abspath(file_path).startswith(os.path.abspath(upload_dir)):
+            print("[MEDIA] Directory traversal attempt")
+            return {"message": "Invalid file path"}, 403
+        
+        if not os.path.exists(file_path):
+            print(f"[MEDIA] File not found: {filename}")
+            return {"message": "File not found"}, 404
+        
+        from flask import send_file
+        return send_file(file_path)
+    
+    except Exception as e:
+        print(f"[MEDIA] Error in download_file: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
 
 
 # ============================================
@@ -388,7 +660,8 @@ def get_form_detail(form_id):
 # ============================================
 
 @app.route("/admin/forms", methods=["POST"])
-def create_form():
+@token_required
+def create_form(current_user):
     """
     Create a new form (ADMIN ONLY)
     
@@ -400,7 +673,7 @@ def create_form():
         "version": "1.0"
     }
     """
-    print("\n[ADMIN] POST /admin/forms called")
+    print(f"\n[ADMIN] POST /admin/forms called by {current_user}")
     
     try:
         data = request.get_json()
@@ -423,7 +696,7 @@ def create_form():
         db.session.add(new_form)
         db.session.commit()
         
-        print(f"[ADMIN] Form {data['id']} created successfully")
+        print(f"[ADMIN] Form {data['id']} created successfully by {current_user}")
         
         return {
             "message": "Form created successfully",
@@ -437,11 +710,12 @@ def create_form():
 
 
 @app.route("/admin/forms/<form_id>", methods=["PUT"])
-def update_form(form_id):
+@token_required
+def update_form(current_user, form_id):
     """
     Update form metadata (ADMIN ONLY)
     """
-    print(f"\n[ADMIN] PUT /admin/forms/{form_id} called")
+    print(f"\n[ADMIN] PUT /admin/forms/{form_id} called by {current_user}")
     
     try:
         form = Form.query.filter_by(id=form_id).first()
@@ -462,7 +736,7 @@ def update_form(form_id):
         
         db.session.commit()
         
-        print(f"[ADMIN] Form {form_id} updated successfully")
+        print(f"[ADMIN] Form {form_id} updated successfully by {current_user}")
         
         return {
             "message": "Form updated successfully",
@@ -476,7 +750,8 @@ def update_form(form_id):
 
 
 @app.route("/admin/forms/<form_id>/fields", methods=["POST"])
-def add_field_to_form(form_id):
+@token_required
+def add_field_to_form(current_user, form_id):
     """
     Add a field to a form (ADMIN ONLY)
     
@@ -492,7 +767,7 @@ def add_field_to_form(form_id):
         "help_text": "This is your legal name"
     }
     """
-    print(f"\n[ADMIN] POST /admin/forms/{form_id}/fields called")
+    print(f"\n[ADMIN] POST /admin/forms/{form_id}/fields called by {current_user}")
     
     try:
         form = Form.query.filter_by(id=form_id).first()
@@ -525,7 +800,7 @@ def add_field_to_form(form_id):
         db.session.add(new_field)
         db.session.commit()
         
-        print(f"[ADMIN] Field {data['field_id']} added to form {form_id}")
+        print(f"[ADMIN] Field {data['field_id']} added to form {form_id} by {current_user}")
         
         return {
             "message": "Field added successfully",
@@ -539,11 +814,12 @@ def add_field_to_form(form_id):
 
 
 @app.route("/admin/forms/<form_id>/fields/<int:field_db_id>", methods=["PUT"])
-def update_field(form_id, field_db_id):
+@token_required
+def update_field(current_user, form_id, field_db_id):
     """
     Update a field in a form (ADMIN ONLY)
     """
-    print(f"\n[ADMIN] PUT /admin/forms/{form_id}/fields/{field_db_id} called")
+    print(f"\n[ADMIN] PUT /admin/forms/{form_id}/fields/{field_db_id} called by {current_user}")
     
     try:
         field = Field.query.filter_by(id=field_db_id, form_id=form_id).first()
@@ -570,7 +846,7 @@ def update_field(form_id, field_db_id):
         
         db.session.commit()
         
-        print(f"[ADMIN] Field {field_db_id} updated successfully")
+        print(f"[ADMIN] Field {field_db_id} updated successfully by {current_user}")
         
         return {
             "message": "Field updated successfully",
@@ -584,11 +860,12 @@ def update_field(form_id, field_db_id):
 
 
 @app.route("/admin/forms/<form_id>/fields/<int:field_db_id>", methods=["DELETE"])
-def delete_field(form_id, field_db_id):
+@token_required
+def delete_field(current_user, form_id, field_db_id):
     """
     Delete a field from a form (ADMIN ONLY)
     """
-    print(f"\n[ADMIN] DELETE /admin/forms/{form_id}/fields/{field_db_id} called")
+    print(f"\n[ADMIN] DELETE /admin/forms/{form_id}/fields/{field_db_id} called by {current_user}")
     
     try:
         field = Field.query.filter_by(id=field_db_id, form_id=form_id).first()
@@ -599,7 +876,7 @@ def delete_field(form_id, field_db_id):
         db.session.delete(field)
         db.session.commit()
         
-        print(f"[ADMIN] Field {field_db_id} deleted successfully")
+        print(f"[ADMIN] Field {field_db_id} deleted successfully by {current_user}")
         
         return {"message": "Field deleted successfully"}, 200
     
@@ -610,11 +887,12 @@ def delete_field(form_id, field_db_id):
 
 
 @app.route("/admin/forms/<form_id>", methods=["DELETE"])
-def delete_form(form_id):
+@token_required
+def delete_form(current_user, form_id):
     """
     Delete a form (ADMIN ONLY)
     """
-    print(f"\n[ADMIN] DELETE /admin/forms/{form_id} called")
+    print(f"\n[ADMIN] DELETE /admin/forms/{form_id} called by {current_user}")
     
     try:
         form = Form.query.filter_by(id=form_id).first()
@@ -625,15 +903,175 @@ def delete_form(form_id):
         db.session.delete(form)
         db.session.commit()
         
-        print(f"[ADMIN] Form {form_id} deleted successfully")
+        print(f"[ADMIN] Form {form_id} deleted successfully by {current_user}")
         
         return {"message": "Form deleted successfully"}, 200
+    
     
     except Exception as e:
         db.session.rollback()
         print(f"[ADMIN] Error in delete_form: {str(e)}")
         return {"message": f"Error: {str(e)}"}, 500
 
+
+# ============================================
+# SUBMISSION MANAGEMENT ENDPOINTS
+# ============================================
+
+@app.route("/forms/<form_id>/submissions", methods=["GET"])
+def get_form_submissions(form_id):
+    """
+    Get all submissions for a specific form
+    """
+    print(f"\n[SUBMISSION] GET /forms/{form_id}/submissions called")
+
+    try:
+        form = Form.query.filter_by(id=form_id).first()
+
+        if not form:
+            return {
+                "status": "error",
+                "message": f"Form {form_id} not found"
+            }, 404
+
+        limit = request.args.get("limit", 50, type=int)
+        offset = request.args.get("offset", 0, type=int)
+        status_filter = request.args.get("status")
+
+        query = FormSubmission.query.filter_by(form_id=form_id)
+
+        if status_filter:
+            query = query.filter_by(sync_status=status_filter)
+
+        total = query.count()
+
+        submissions = query.order_by(
+            FormSubmission.created_at.desc()
+        ).limit(limit).offset(offset).all()
+
+        return {
+            "status": "success",
+            "submissions": [s.to_dict() for s in submissions],
+            "count": len(submissions),
+            "total": total
+        }, 200
+
+    except Exception as e:
+        print(f"[SUBMISSION] Error: {str(e)}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+
+@app.route("/submissions/<int:submission_id>", methods=["GET"])
+def get_submission(submission_id):
+    """
+    Get a specific submission
+    """
+    print(f"\n[SUBMISSION] GET /submissions/{submission_id} called")
+
+    try:
+        submission = FormSubmission.query.filter_by(
+            id=submission_id
+        ).first()
+
+        if not submission:
+            return {
+                "status": "error",
+                "message": f"Submission {submission_id} not found"
+            }, 404
+
+        return {
+            "status": "success",
+            "submission": submission.to_dict()
+        }, 200
+
+    except Exception as e:
+        print(f"[SUBMISSION] Error: {str(e)}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+
+@app.route("/admin/submissions", methods=["GET"])
+def get_all_submissions():
+    """
+    Get all submissions
+    """
+    print("\n[ADMIN] GET /admin/submissions called")
+
+    try:
+        query = FormSubmission.query
+
+        form_id_filter = request.args.get("form_id")
+        if form_id_filter:
+            query = query.filter_by(form_id=form_id_filter)
+
+        status_filter = request.args.get("status")
+        if status_filter:
+            query = query.filter_by(sync_status=status_filter)
+
+        limit = request.args.get("limit", 50, type=int)
+        offset = request.args.get("offset", 0, type=int)
+
+        total = query.count()
+
+        submissions = query.order_by(
+            FormSubmission.created_at.desc()
+        ).limit(limit).offset(offset).all()
+
+        return {
+            "status": "success",
+            "submissions": [s.to_dict() for s in submissions],
+            "count": len(submissions),
+            "total": total
+        }, 200
+
+    except Exception as e:
+        print(f"[ADMIN] Error: {str(e)}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
+
+@app.route("/admin/submissions/<int:submission_id>", methods=["DELETE"])
+def delete_submission(submission_id):
+    """
+    Delete a submission
+    """
+    print(f"\n[ADMIN] DELETE /admin/submissions/{submission_id} called")
+
+    try:
+        submission = FormSubmission.query.filter_by(
+            id=submission_id
+        ).first()
+
+        if not submission:
+            return {
+                "status": "error",
+                "message": f"Submission {submission_id} not found"
+            }, 404
+
+        db.session.delete(submission)
+        db.session.commit()
+
+        return {
+            "status": "success",
+            "message": "Submission deleted"
+        }, 200
+
+    except Exception as e:
+        db.session.rollback()
+
+        print(f"[ADMIN] Error: {str(e)}")
+
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
 
 if __name__ == "__main__":
     print("\n" + "="*50)
