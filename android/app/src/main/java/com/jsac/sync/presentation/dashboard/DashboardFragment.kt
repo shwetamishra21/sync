@@ -3,6 +3,7 @@ package com.jsac.sync.presentation.dashboard
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -31,6 +32,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
     private lateinit var tvEmpty: TextView
     private lateinit var containerEmpty: LinearLayout
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var btnBackToHome: Button  // ✅ ADDED
 
     private lateinit var formAdapter: FormListAdapter
 
@@ -52,6 +54,7 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         tvEmpty = view.findViewById(R.id.tvEmpty)
         containerEmpty = view.findViewById(R.id.containerEmpty)
         swipeRefresh = view.findViewById(R.id.swipeRefresh)
+        btnBackToHome = view.findViewById(R.id.btnBackToHome)  // ✅ ADDED
 
         // ============================================
         // SETUP RECYCLER VIEW
@@ -66,6 +69,26 @@ class DashboardFragment : Fragment(R.layout.fragment_dashboard) {
         swipeRefresh.setOnRefreshListener {
             Log.d("DashboardFragment", "🔄 Pull-to-refresh triggered")
             viewModel.refreshForms()  // ✅ Clears cache and fetches fresh
+        }
+
+        // ============================================
+        // ✅ FIXED: SETUP BACK TO HOME BUTTON
+        // ============================================
+
+        btnBackToHome.setOnClickListener {
+            Log.d("DashboardFragment", "🔄 User clicked 'Back to Home'")
+            Log.d("DashboardFragment", "📍 This will navigate back to HomeFragment where sync is triggered")
+
+            try {
+                findNavController().navigate(R.id.action_dashboard_to_home)
+            } catch (e: Exception) {
+                Log.e("DashboardFragment", "❌ Navigation error: ${e.message}", e)
+                Toast.makeText(
+                    requireContext(),
+                    "Navigation error: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
 
         // ============================================

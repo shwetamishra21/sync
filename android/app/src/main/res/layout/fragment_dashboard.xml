@@ -87,4 +87,15 @@
         android:textColor="@android:color/holo_red_dark"
         android:visibility="gone"/>
 
+    <!-- ✅ FIXED: Added back to home button -->
+    <!-- This gives users a way to manually trigger sync from dashboard -->
+    <Button
+        android:id="@+id/btnBackToHome"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🏠 Back to Home"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="@color/sync_button_color"
+        android:visibility="visible"/>
+
 </LinearLayout>

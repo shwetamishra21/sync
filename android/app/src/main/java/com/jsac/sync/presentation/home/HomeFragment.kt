@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -24,6 +25,7 @@ import kotlinx.coroutines.launch
  * - Shows pending items count
  * - Shows sync status
  * - Manual sync button
+ * - View saved submissions button
  */
 @AndroidEntryPoint
 class HomeFragment : Fragment(R.layout.fragment_home) {
@@ -37,6 +39,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private lateinit var progressBarSync: ProgressBar
     private lateinit var btnManualSync: Button
     private lateinit var btnViewForms: Button
+    private lateinit var btnViewSubmissions: Button
     private lateinit var btnLogout: Button
 
     override fun onViewCreated(
@@ -53,6 +56,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         progressBarSync = view.findViewById(R.id.progressBarSync)
         btnManualSync = view.findViewById(R.id.btnManualSync)
         btnViewForms = view.findViewById(R.id.btnViewForms)
+        btnViewSubmissions = view.findViewById(R.id.btnViewSubmissions)
         btnLogout = view.findViewById(R.id.btnLogout)
 
         // ============================================
@@ -85,6 +89,11 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             }
         }
 
+        btnViewSubmissions.setOnClickListener {
+            Log.d("HomeFragment", "📂 View Submissions button clicked")
+            navigateToSubmissions()
+        }
+
         btnManualSync.setOnClickListener {
             Log.d("HomeFragment", "🚀 Manual sync triggered")
             syncStatusViewModel.triggerSync(requireContext())
@@ -104,6 +113,41 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     }
 
     /**
+     * Navigate to saved submissions screen
+     */
+    private fun navigateToSubmissions() {
+        Log.d("HomeFragment", "→ Navigating to Submissions List")
+
+        try {
+            findNavController().navigate(R.id.action_home_to_submissions)
+            Log.d("HomeFragment", "✅ Navigation successful")
+        } catch (e: IllegalArgumentException) {
+            Log.e(
+                "HomeFragment",
+                "❌ Navigation action not found: ${e.message}"
+            )
+
+            Toast.makeText(
+                requireContext(),
+                "Cannot navigate to submissions. Action not found.",
+                Toast.LENGTH_SHORT
+            ).show()
+        } catch (e: Exception) {
+            Log.e(
+                "HomeFragment",
+                "❌ Navigation error: ${e.message}",
+                e
+            )
+
+            Toast.makeText(
+                requireContext(),
+                "Navigation error: ${e.message}",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    /**
      * Update UI based on sync status
      */
     private fun updateSyncUI(status: SyncStatusViewModel.SyncStatus) {
@@ -112,10 +156,12 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         // Show pending count
         if (status.pendingFormCount > 0 || status.pendingMediaCount > 0) {
             tvPendingCount.visibility = View.VISIBLE
+
             tvPendingCount.text = buildString {
                 if (status.pendingFormCount > 0) {
                     append("📋 ${status.pendingFormCount} pending form(s)")
                 }
+
                 if (status.pendingMediaCount > 0) {
                     if (status.pendingFormCount > 0) append("\n")
                     append("📸 ${status.pendingMediaCount} pending media file(s)")

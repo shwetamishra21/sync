@@ -107,22 +107,58 @@ class FormSubmissionRepository @Inject constructor(
     // ============================================
 
     /**
-     * Get a specific submission from local DB
+     * Get all submissions
+     * Ordered by creation date (newest first)
      */
-    fun getSubmissionById(submissionId: Int): Flow<FormSubmissionEntity?> =
-        submissionDao.getSubmissionById(submissionId)
+    fun getAllSubmissions(): Flow<List<FormSubmissionEntity>> = flow {
+        try {
+            submissionDao.getAllSubmissions().collect { submissions ->
+                Log.d("FormSubmissionRepository", "📋 Got ${submissions.size} submissions")
+                emit(submissions)
+            }
+        } catch (e: Exception) {
+            Log.e("FormSubmissionRepository", "❌ Error getting all submissions: ${e.message}", e)
+            emit(emptyList())
+        }
+    }
 
     /**
-     * Get all submissions for a form
+     * Get submissions filtered by sync status
+     * @param status PENDING, SYNCING, SYNCED, or FAILED
+     */
+    fun getSubmissionsByStatus(status: String): Flow<List<FormSubmissionEntity>> = flow {
+        try {
+            Log.d("FormSubmissionRepository", "🔍 Getting submissions with status: $status")
+            submissionDao.getSubmissionsByStatus(status).collect { submissions ->
+                Log.d("FormSubmissionRepository", "📊 Got ${submissions.size} submissions with status $status")
+                emit(submissions)
+            }
+        } catch (e: Exception) {
+            Log.e("FormSubmissionRepository", "❌ Error getting submissions by status: ${e.message}", e)
+            emit(emptyList())
+        }
+    }
+
+    /**
+     * Get a single submission by ID (Flow version)
+     */
+    fun getSubmissionById(submissionId: Int): Flow<FormSubmissionEntity?> = flow {
+        try {
+            Log.d("FormSubmissionRepository", "📋 Getting submission: $submissionId")
+            submissionDao.getSubmissionById(submissionId).collect { submission ->
+                emit(submission)
+            }
+        } catch (e: Exception) {
+            Log.e("FormSubmissionRepository", "❌ Error getting submission: ${e.message}", e)
+            emit(null)
+        }
+    }
+
+    /**
+     * Get a specific submission from local DB
      */
     fun getSubmissionsByFormId(formId: String): Flow<List<FormSubmissionEntity>> =
         submissionDao.getSubmissionsByFormId(formId)
-
-    /**
-     * Get submissions by sync status
-     */
-    fun getSubmissionsByStatus(status: String): Flow<List<FormSubmissionEntity>> =
-        submissionDao.getSubmissionsByStatus(status)
 
     /**
      * Get all pending submissions for sync
@@ -131,11 +167,19 @@ class FormSubmissionRepository @Inject constructor(
         submissionDao.getPendingSyncSubmissions(limit)
 
     /**
-     * Count submissions by status
-     * Used for showing badge counts in UI
+     * Get count of submissions by status
      */
-    suspend fun countByStatus(status: String): Int =
-        submissionDao.countByStatus(status)
+    suspend fun countByStatus(status: String): Int {
+        return try {
+            Log.d("FormSubmissionRepository", "📊 Counting submissions with status: $status")
+            val count = submissionDao.countByStatus(status)
+            Log.d("FormSubmissionRepository", "✅ Count: $count")
+            count
+        } catch (e: Exception) {
+            Log.e("FormSubmissionRepository", "❌ Error counting submissions: ${e.message}", e)
+            0
+        }
+    }
 
     // ============================================
     // GET MEDIA FILES
@@ -173,7 +217,7 @@ class FormSubmissionRepository @Inject constructor(
         gpsLocation: GpsLocation? = null
     ): Result<String> {
         return try {
-            val submission = getSubmissionByIdOnce(submissionId)
+            val submission = submissionDao.getSubmissionByIdOnce(submissionId)
                 ?: return Result.failure(Exception("Submission not found"))
 
             // Mark as syncing
@@ -225,6 +269,129 @@ class FormSubmissionRepository @Inject constructor(
     }
 
     // ============================================
+    // MANUAL SYNC - NEW METHODS
+    // ============================================
+
+    /**
+     * Sync a submission to server (manual sync from UI)
+     *
+     * @param submissionId ID of submission to sync
+     * @return Result with submission ID from server or error
+     */
+    suspend fun syncSubmissionManually(submissionId: Int): Result<String> {
+        Log.d("FormSubmissionRepository", "⚡ Manual sync for submission: $submissionId")
+
+        return try {
+            // Get submission
+            val submission = submissionDao.getSubmissionByIdOnce(submissionId)
+                ?: return Result.failure(Exception("Submission not found"))
+
+            // Mark as syncing
+            submissionDao.updateSubmissionStatus(submissionId, "SYNCING")
+
+            // Parse form data
+            val formData: Map<String, String> = try {
+                gson.fromJson(submission.form_data, Map::class.java) as Map<String, String>
+            } catch (e: Exception) {
+                Log.e("FormSubmissionRepository", "Error parsing form data: ${e.message}")
+                emptyMap()
+            }
+
+            // Create request
+            val request = SubmitFormRequest(
+                formId = submission.form_id,
+                formData = formData,
+                submittedAt = submission.created_at,
+                gpsLocation = null
+            )
+
+            // Send to server
+            val response = api.submitForm(request)
+
+            if (response.isSuccessful && response.body() != null) {
+                val submissionIdFromServer = response.body()!!.submissionId
+
+                // Mark as synced
+                submissionDao.markAsSynced(submissionId)
+
+                Log.d("FormSubmissionRepository", "✅ Manual sync successful: $submissionIdFromServer")
+                Result.success(submissionIdFromServer)
+
+            } else {
+                val errorMsg = "HTTP ${response.code()}: ${response.message()}"
+                submissionDao.markAsFailed(submissionId, errorMsg)
+
+                Log.e("FormSubmissionRepository", "❌ Manual sync failed: $errorMsg")
+                Result.failure(Exception(errorMsg))
+            }
+
+        } catch (e: Exception) {
+            Log.e("FormSubmissionRepository", "❌ Exception during manual sync: ${e.message}", e)
+            try {
+                submissionDao.markAsFailed(submissionId, e.message ?: "Unknown error")
+            } catch (updateError: Exception) {
+                Log.e("FormSubmissionRepository", "Error updating status: ${updateError.message}")
+            }
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Sync multiple submissions (batch sync from UI)
+     *
+     * @param submissionIds List of submission IDs to sync
+     * @return Result with sync stats (successful, failed counts)
+     */
+    suspend fun syncMultipleSubmissions(
+        submissionIds: List<Int>
+    ): Result<SyncResult> {
+
+        Log.d(
+            "FormSubmissionRepository",
+            "⚡ Batch sync for ${submissionIds.size} submissions"
+        )
+
+        var successCount = 0
+        var failureCount = 0
+        val failedIds = mutableListOf<Int>()
+
+        return try {
+
+            for (submissionId in submissionIds) {
+
+                val result = syncSubmissionManually(submissionId)
+
+                result.onSuccess {
+                    successCount++
+                }
+
+                result.onFailure {
+                    failureCount++
+                    failedIds.add(submissionId)
+                }
+            }
+
+            Result.success(
+                SyncResult(
+                    total = submissionIds.size,
+                    successful = successCount,
+                    failed = failureCount,
+                    failedIds = failedIds
+                )
+            )
+
+        } catch (e: Exception) {
+            Log.e(
+                "FormSubmissionRepository",
+                "❌ Batch sync error: ${e.message}",
+                e
+            )
+
+            Result.failure(e)
+        }
+    }
+
+    // ============================================
     // UPDATE OPERATIONS
     // ============================================
 
@@ -242,11 +409,22 @@ class FormSubmissionRepository @Inject constructor(
         mediaFileDao.markAsUploaded(mediaId, serverUrl)
     }
 
+    // ============================================
+    // DELETE - NEW METHOD
+    // ============================================
+
     /**
-     * Delete a submission (and its media files via cascade)
+     * Delete a submission
      */
     suspend fun deleteSubmission(submissionId: Int) {
-        submissionDao.deleteSubmissionById(submissionId)
+        try {
+            Log.d("FormSubmissionRepository", "🗑️ Deleting submission: $submissionId")
+            submissionDao.deleteSubmissionById(submissionId)
+            Log.d("FormSubmissionRepository", "✅ Deleted successfully")
+        } catch (e: Exception) {
+            Log.e("FormSubmissionRepository", "❌ Error deleting: ${e.message}", e)
+            throw e
+        }
     }
 
     // ============================================
@@ -255,11 +433,44 @@ class FormSubmissionRepository @Inject constructor(
 
     /**
      * Get submission by ID (non-Flow version for internal use)
-     * Uses block body to properly handle the Flow collection
      */
     private suspend fun getSubmissionByIdOnce(submissionId: Int): FormSubmissionEntity? {
         var result: FormSubmissionEntity? = null
         submissionDao.getSubmissionById(submissionId).collect { result = it }
         return result
+    }
+
+    /**
+     * Get form name for a submission
+     */
+    suspend fun getFormNameById(formId: String): String {
+        Log.d("FormSubmissionRepository", "📋 Getting form name for: $formId")
+        return try {
+            // Return form ID as name if no separate Form entity exists
+            // TODO: Replace with actual form name query if Form table exists
+            formId
+        } catch (e: Exception) {
+            Log.e("FormSubmissionRepository", "Error getting form name: ${e.message}")
+            formId
+        }
+    }
+
+    // ============================================
+    // DATA CLASS FOR SYNC RESULT
+    // ============================================
+
+    /**
+     * Result of batch sync operation
+     */
+    data class SyncResult(
+        val total: Int,
+        val successful: Int,
+        val failed: Int,
+        val failedIds: List<Int> = emptyList()
+    ) {
+        override fun toString(): String {
+            return "$successful/$total synced successfully" +
+                    if (failed > 0) ", $failed failed" else ""
+        }
     }
 }

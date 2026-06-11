@@ -110,4 +110,159 @@ object SyncScheduler {
     suspend fun getPendingMediaCount(repository: FormSubmissionRepository): Int {
         return repository.countByStatus("LOCAL")
     }
+    // ============================================
+// ADD THESE METHODS TO: SyncScheduler.kt
+// Location: android/app/src/main/java/com/jsac/sync/worker/SyncScheduler.kt
+// ============================================
+
+    /**
+     * Sync a specific submission
+     * Called when user manually triggers sync from UI
+     *
+     * @param context Android context
+     * @param submissionId ID of submission to sync
+     */
+    fun syncSubmission(context: Context, submissionId: Int) {
+        Log.d("SyncScheduler", "📋 Triggering sync for submission: $submissionId")
+
+        try {
+            // Create data that will be passed to the worker
+            val inputData = androidx.work.Data.Builder()
+                .putInt("submission_id", submissionId)
+                .build()
+
+            // Create one-time work request for this submission
+            val syncRequest = androidx.work.OneTimeWorkRequestBuilder<FormSyncWorker>()
+                .setInputData(inputData)
+                .setConstraints(
+                    androidx.work.Constraints.Builder()
+                        .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                        .build()
+                )
+                .setBackoffCriteria(
+                    androidx.work.BackoffPolicy.EXPONENTIAL,
+                    5,
+                    java.util.concurrent.TimeUnit.MINUTES
+                )
+                .addTag("submission_sync_$submissionId")
+                .build()
+
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                "sync_submission_$submissionId",
+                androidx.work.ExistingWorkPolicy.KEEP,
+                syncRequest
+            )
+
+            Log.d("SyncScheduler", "✅ Submission sync scheduled for ID: $submissionId")
+
+        } catch (e: Exception) {
+            Log.e("SyncScheduler", "❌ Error scheduling sync: ${e.message}", e)
+            throw e
+        }
+    }
+
+    /**
+     * Sync multiple submissions
+     * Called when user selects multiple submissions and syncs them
+     *
+     * @param context Android context
+     * @param submissionIds List of submission IDs to sync
+     */
+    fun syncMultipleSubmissions(context: Context, submissionIds: List<Int>) {
+        Log.d("SyncScheduler", "📋 Triggering sync for ${submissionIds.size} submissions")
+
+        if (submissionIds.isEmpty()) {
+            Log.w("SyncScheduler", "⚠️ No submissions to sync")
+            return
+        }
+
+        try {
+            // Create data with submission IDs as a JSON array
+            val idsJson = com.google.gson.Gson().toJson(submissionIds)
+            val inputData = androidx.work.Data.Builder()
+                .putString("submission_ids", idsJson)
+                .build()
+
+            // Create one-time work request for these submissions
+            val syncRequest = androidx.work.OneTimeWorkRequestBuilder<FormSyncWorker>()
+                .setInputData(inputData)
+                .setConstraints(
+                    androidx.work.Constraints.Builder()
+                        .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                        .build()
+                )
+                .setBackoffCriteria(
+                    androidx.work.BackoffPolicy.EXPONENTIAL,
+                    5,
+                    java.util.concurrent.TimeUnit.MINUTES
+                )
+                .addTag("batch_sync_${System.currentTimeMillis()}")
+                .build()
+
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                "sync_batch_${System.currentTimeMillis()}",
+                androidx.work.ExistingWorkPolicy.REPLACE,
+                syncRequest
+            )
+
+            Log.d("SyncScheduler", "✅ Batch sync scheduled for ${submissionIds.size} submissions")
+
+        } catch (e: Exception) {
+            Log.e("SyncScheduler", "❌ Error scheduling batch sync: ${e.message}", e)
+            throw e
+        }
+    }
+
+    /**
+     * Get sync status for a specific submission
+     * Returns a Flow that emits the current sync status
+     *
+     * @param context Android context
+     * @param submissionId ID of submission
+     * @return Flow of work info for the submission
+     */
+    fun getSyncStatus(context: Context, submissionId: Int) =
+        WorkManager.getInstance(context)
+            .getWorkInfosByTagLiveData("submission_sync_$submissionId")
+
+    /**
+     * Cancel sync for a specific submission
+     *
+     * @param context Android context
+     * @param submissionId ID of submission
+     */
+    fun cancelSync(context: Context, submissionId: Int) {
+        Log.d("SyncScheduler", "❌ Canceling sync for submission: $submissionId")
+
+        try {
+            WorkManager.getInstance(context)
+                .cancelAllWorkByTag("submission_sync_$submissionId")
+
+            Log.d("SyncScheduler", "✅ Sync cancelled for submission: $submissionId")
+
+        } catch (e: Exception) {
+            Log.e("SyncScheduler", "❌ Error canceling sync: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Check if a submission is currently syncing
+     *
+     * @param context Android context
+     * @param submissionId ID of submission
+     * @return true if currently syncing, false otherwise
+     */
+    fun isSubmissionSyncing(context: Context, submissionId: Int): Boolean {
+        return try {
+            val workInfos = WorkManager.getInstance(context)
+                .getWorkInfosByTag("submission_sync_$submissionId")
+                .get()
+
+            workInfos.any { it.state == androidx.work.WorkInfo.State.RUNNING }
+
+        } catch (e: Exception) {
+            Log.e("SyncScheduler", "Error checking sync status: ${e.message}")
+            false
+        }
+    }
 }

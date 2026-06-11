@@ -1,16 +1,80 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
+    <!-- ============================================ -->
+    <!-- EXISTING APP COLORS -->
+    <!-- ============================================ -->
+
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
+
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- Sync Status Colors -->
-    <color name="sync_status_background">#1e1e1e</color>
+    <!-- ============================================ -->
+    <!-- HOME / SYNC COLORS -->
+    <!-- ============================================ -->
+
+    <color name="sync_status_background">#1E1E1E</color>
     <color name="sync_success_color">#FF4CAF50</color>
     <color name="sync_button_color">#FF2196F3</color>
     <color name="logout_button_color">#FFF44336</color>
+
+    <!-- ============================================ -->
+    <!-- SUBMISSION STATUS COLORS -->
+    <!-- ============================================ -->
+
+    <color name="status_pending">#FFC107</color>
+    <color name="status_syncing">#2196F3</color>
+    <color name="status_synced">#4CAF50</color>
+    <color name="status_failed">#F44336</color>
+
+    <!-- ============================================ -->
+    <!-- BACKGROUND COLORS -->
+    <!-- ============================================ -->
+
+    <color name="header_background">@color/purple_200</color>
+    <color name="card_background">#F5F5F5</color>
+    <color name="error_background">#FFEBEE</color>
+    <color name="success_background">#E8F5E9</color>
+    <color name="info_background">#E3F2FD</color>
+
+    <!-- ============================================ -->
+    <!-- TEXT COLORS -->
+    <!-- ============================================ -->
+
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_error">#C62828</color>
+    <color name="text_success">#2E7D32</color>
+
+    <!-- ============================================ -->
+    <!-- BUTTON COLORS -->
+    <!-- ============================================ -->
+
+    <color name="btn_sync">#2196F3</color>
+    <color name="btn_delete">#F44336</color>
+    <color name="btn_back">#757575</color>
+    <color name="btn_disabled">#BDBDBD</color>
+
+    <!-- ============================================ -->
+    <!-- BADGE COLORS -->
+    <!-- ============================================ -->
+
+    <color name="badge_pending">#FFF3E0</color>
+    <color name="badge_syncing">#E3F2FD</color>
+    <color name="badge_synced">#E8F5E9</color>
+    <color name="badge_failed">#FFEBEE</color>
+
+    <!-- ============================================ -->
+    <!-- UTILITY COLORS -->
+    <!-- ============================================ -->
+
+    <color name="divider">#BDBDBD</color>
+    <color name="overlay">#80000000</color>
+    <color name="transparent">#00000000</color>
+
 </resources>

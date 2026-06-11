@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@android:color/white">
+
+    <!-- ============================================ -->
+    <!-- LOADING PROGRESS -->
+    <!-- ============================================ -->
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="32dp"
+        android:visibility="gone"/>
+
+    <!-- ============================================ -->
+    <!-- SCROLLABLE CONTENT -->
+    <!-- ============================================ -->
+
+    <ScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="visible">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- ============================================ -->
+            <!-- HEADER SECTION -->
+            <!-- ============================================ -->
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@color/purple_200"
+                android:padding="12dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:id="@+id/tvFormName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/black"
+                    android:layout_marginBottom="4dp"
+                    tools:text="📋 Contact Form"/>
+
+                <TextView
+                    android:id="@+id/tvFormId"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="@android:color/darker_gray"
+                    android:layout_marginBottom="2dp"
+                    tools:text="Submission ID: #1234"/>
+
+                <TextView
+                    android:id="@+id/tvCreatedAt"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:textColor="@android:color/darker_gray"
+                    tools:text="📅 Created: Jun 10, 2026 14:30:45"/>
+
+            </LinearLayout>
+
+            <!-- ============================================ -->
+            <!-- STATUS SECTION -->
+            <!-- ============================================ -->
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#F5F5F5"
+                android:padding="12dp"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:id="@+id/tvSyncStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/black"
+                    android:layout_marginBottom="4dp"
+                    tools:text="Status: ✅ Synced"/>
+
+                <TextView
+                    android:id="@+id/tvSyncedAt"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:textColor="@android:color/darker_gray"
+                    android:layout_marginBottom="4dp"
+                    tools:text="✅ Synced: Jun 10, 2026 14:31:20"
+                    android:visibility="gone"/>
+
+                <TextView
+                    android:id="@+id/tvRetryCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:textColor="@android:color/holo_orange_dark"
+                    android:layout_marginBottom="4dp"
+                    tools:text="🔁 Retry count: 2"
+                    android:visibility="gone"/>
+
+                <TextView
+                    android:id="@+id/tvErrorMessage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:textColor="@android:color/holo_red_dark"
+                    android:background="@android:color/white"
+                    android:padding="8dp"
+                    android:layout_marginTop="8dp"
+                    tools:text="⚠️ Error: Network timeout"
+                    android:visibility="gone"/>
+
+            </LinearLayout>
+
+            <!-- ============================================ -->
+            <!-- FORM DATA SECTION -->
+            <!-- ============================================ -->
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📊 Form Data"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@android:color/black"
+                android:layout_marginBottom="12dp"/>
+
+            <LinearLayout
+                android:id="@+id/containerFormData"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="24dp">
+
+                <!-- Dynamic form fields will be added here -->
+
+            </LinearLayout>
+
+            <!-- Spacer -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="24dp"/>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+    <!-- ============================================ -->
+    <!-- ACTION BUTTONS -->
+    <!-- ============================================ -->
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="@color/white"
+        android:elevation="8dp">
+
+        <!-- Sync Button -->
+        <Button
+            android:id="@+id/btnSync"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🔄 Sync Now"
+            android:textAllCaps="false"
+            android:layout_marginEnd="8dp"/>
+
+        <!-- Delete Button -->
+        <Button
+            android:id="@+id/btnDelete"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🗑️ Delete"
+            android:textAllCaps="false"
+            android:backgroundTint="@android:color/holo_red_dark"
+            android:layout_marginEnd="8dp"/>
+
+        <!-- Back Button -->
+        <Button
+            android:id="@+id/btnBack"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="⬅️ Back"
+            android:textAllCaps="false"/>
+
+    </LinearLayout>
+
+</LinearLayout>

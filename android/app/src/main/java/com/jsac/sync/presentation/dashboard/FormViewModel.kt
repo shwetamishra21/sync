@@ -1,5 +1,6 @@
 package com.jsac.sync.presentation.dashboard
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,7 +8,9 @@ import com.jsac.sync.data.local.db.entity.FormEntity
 import com.jsac.sync.data.remote.dto.FormDetail
 import com.jsac.sync.data.repository.FormRepository
 import com.jsac.sync.data.repository.FormSubmissionRepository
+import com.jsac.sync.worker.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,11 +23,13 @@ import javax.inject.Inject
  * - Loading form details
  * - Managing form state (data, validation)
  * - Submitting forms (offline-first)
+ * - ✅ FIXED: Triggers sync after form submission
  */
 @HiltViewModel
 class FormDetailViewModel @Inject constructor(
     private val formRepository: FormRepository,
-    private val submissionRepository: FormSubmissionRepository
+    private val submissionRepository: FormSubmissionRepository,
+    @ApplicationContext private val context: Context  // ✅ ADDED: For triggering sync
 ) : ViewModel() {
 
     sealed class UiState {
@@ -150,7 +155,15 @@ class FormDetailViewModel @Inject constructor(
 
     /**
      * Submit form (offline-first)
-     * Saves locally and returns immediately
+     * ✅ FIXED: Now triggers sync immediately after saving locally
+     *
+     * Flow:
+     * 1. Validate form
+     * 2. Save to local Room database (offline-first)
+     * 3. ✅ Trigger WorkManager sync immediately
+     * 4. Return success to user
+     * 5. User sees form submitted message
+     * 6. Background sync happens automatically
      */
     fun submitForm(formId: String, form: FormDetail) {
         Log.d("FormDetailViewModel", "📤 Submitting form: $formId")
@@ -183,6 +196,23 @@ class FormDetailViewModel @Inject constructor(
 
                     // Clear form after successful submission
                     clearFormData()
+
+                    // ✅ FIXED: Trigger sync immediately after form submission
+                    // This ensures the form is synced to the backend as soon as possible
+                    Log.d("FormDetailViewModel", "🔄 Triggering sync after form submission...")
+
+                    viewModelScope.launch {
+                        try {
+                            // Schedule background sync tasks (Form Sync + Media Upload)
+                            SyncScheduler.syncAll(context)
+                            Log.d("FormDetailViewModel", "✅ Sync scheduled successfully")
+                            Log.d("FormDetailViewModel", "📍 Form will sync to backend in background")
+                        } catch (e: Exception) {
+                            // Continue anyway - form is saved locally
+                            Log.e("FormDetailViewModel", "⚠️ Failed to schedule sync: ${e.message}")
+                            Log.e("FormDetailViewModel", "ℹ️ Form is saved locally and will sync when device goes to home screen")
+                        }
+                    }
 
                 }.onFailure { error ->
                     Log.e("FormDetailViewModel", "❌ Submission error: ${error.message}", error)

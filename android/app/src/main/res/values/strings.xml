@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
+    <!-- App -->
     <string name="app_name">sync</string>
 
+    <!-- ============================================ -->
     <!-- Home Fragment -->
+    <!-- ============================================ -->
+
     <string name="home_title">Home</string>
     <string name="home_subtitle">Welcome to JSAC Sync</string>
     <string name="home_sync_status_label">📊 Sync Status</string>
@@ -12,14 +17,108 @@
     <string name="home_manual_sync">🔄 Manual Sync</string>
     <string name="home_logout">🚪 Logout</string>
 
-    <!-- Form Detail Fragment -->
+    <!-- ============================================ -->
+    <!-- SUBMISSIONS LIST SCREEN -->
+    <!-- ============================================ -->
+
+    <string name="title_saved_submissions">📋 Saved Submissions</string>
+    <string name="subtitle_submissions">View and sync your form submissions</string>
+
+    <string name="label_filter">Filter:</string>
+    <string name="filter_all">All</string>
+    <string name="filter_pending">Pending</string>
+    <string name="filter_syncing">Syncing</string>
+    <string name="filter_synced">Synced</string>
+    <string name="filter_failed">Failed</string>
+
+    <string name="btn_sync_all_pending">🔄 Sync All Pending</string>
+    <string name="btn_view_forms">📋 View Forms</string>
+    <string name="btn_view_submissions">📋 View Saved Submissions</string>
+
+    <string name="msg_no_submissions">No saved submissions</string>
+    <string name="msg_empty_state">📭</string>
+
+    <!-- ============================================ -->
+    <!-- SUBMISSION STATUS -->
+    <!-- ============================================ -->
+
+    <string name="status_pending">⏳ Pending</string>
+    <string name="status_syncing">🔄 Syncing</string>
+    <string name="status_synced">✅ Synced</string>
+    <string name="status_failed">❌ Failed</string>
+
+    <string name="label_retry_count">🔁 Retry count:</string>
+    <string name="label_retries">🔁 Retries:</string>
+
+    <!-- ============================================ -->
+    <!-- SUBMISSION DETAIL SCREEN -->
+    <!-- ============================================ -->
+
+    <string name="title_submission_details">📋 Submission Details</string>
+    <string name="label_form_data">📊 Form Data</string>
+    <string name="label_sync_information">Sync Information</string>
+    <string name="label_error_details">Error Details</string>
+
+    <string name="label_created">📅 Created:</string>
+    <string name="label_synced">✅ Synced:</string>
+    <string name="label_status">Status:</string>
+    <string name="label_form_id">Submission ID:</string>
+    <string name="label_form">Form ID:</string>
+
+    <string name="btn_sync_now">🔄 Sync Now</string>
+    <string name="btn_delete">🗑️ Delete</string>
+    <string name="btn_back">⬅️ Back</string>
+    <string name="btn_sync">🔄 Sync</string>
+
+    <!-- ============================================ -->
+    <!-- MESSAGES & NOTIFICATIONS -->
+    <!-- ============================================ -->
+
+    <string name="msg_sync_started">Sync started for submission #%1$d</string>
+    <string name="msg_sync_started_all">Sync started for all pending submissions</string>
+    <string name="msg_submission_deleted">Submission deleted</string>
+    <string name="msg_submission_not_found">Submission not found</string>
+    <string name="msg_sync_already_synced">✅ Already Synced</string>
+
+    <string name="msg_error_sync_failed">Sync failed: %1$s</string>
+    <string name="msg_error_delete_failed">Delete failed: %1$s</string>
+    <string name="msg_error_loading_failed">Error loading submission: %1$s</string>
+    <string name="msg_error_navigation">Navigation error</string>
+
+    <string name="msg_syncing">🔄 Syncing...</string>
+
+    <!-- ============================================ -->
+    <!-- LABELS FOR SUBMISSION ITEMS -->
+    <!-- ============================================ -->
+
+    <string name="label_form_name">📋 Form:</string>
+    <string name="label_date">📅</string>
+    <string name="label_error">⚠️ Error:</string>
+
+    <!-- ============================================ -->
+    <!-- SYNC STATISTICS -->
+    <!-- ============================================ -->
+
+    <string name="stat_total_submissions">Total Submissions</string>
+    <string name="stat_pending_count">Pending</string>
+    <string name="stat_synced_count">Synced</string>
+    <string name="stat_failed_count">Failed</string>
+
+    <!-- ============================================ -->
+    <!-- FORM DETAIL FRAGMENT -->
+    <!-- ============================================ -->
+
     <string name="form_submit_button">Submit Form</string>
     <string name="form_submitting">Submitting...</string>
     <string name="form_submit_success">✅ Form submitted successfully!</string>
 
-    <!-- General -->
+    <!-- ============================================ -->
+    <!-- GENERAL -->
+    <!-- ============================================ -->
+
     <string name="loading">Loading...</string>
     <string name="error_prefix">Error: </string>
     <string name="retry">Retry</string>
     <string name="cancel">Cancel</string>
+
 </resources>
