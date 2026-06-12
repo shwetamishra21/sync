@@ -98,12 +98,5 @@ class SubmissionDetailViewModel @Inject constructor(
      * Get form name for the submission
      * (can be used to update UI with form details)
      */
-    suspend fun getFormName(formId: String): String {
-        return try {
-            repository.getFormNameById(formId)
-        } catch (e: Exception) {
-            Log.e("SubmissionDetailViewModel", "Error getting form name: ${e.message}")
-            formId // Return form ID if name cannot be fetched
-        }
-    }
+
 }

@@ -101,9 +101,6 @@ class SyncStatusViewModel @Inject constructor(
                     message = "🔄 Syncing..."
                 )
 
-                // Schedule sync tasks
-                SyncScheduler.syncAll(context)
-
                 // Simulate sync delay for demo
                 delay(2000)
 

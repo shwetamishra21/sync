@@ -63,8 +63,12 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         // AUTOMATIC SYNC ON OPEN
         // ============================================
 
-        Log.d("HomeFragment", "🔄 Triggering automatic sync...")
-        SyncScheduler.syncAll(requireContext())
+        // ============================================
+// REFRESH SYNC STATUS ON OPEN
+// ============================================
+
+        Log.d("HomeFragment", "🔄 Refreshing sync status...")
+        syncStatusViewModel.refreshStatus()
 
         // ============================================
         // OBSERVE SYNC STATUS

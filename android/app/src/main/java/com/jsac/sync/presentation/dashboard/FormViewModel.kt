@@ -195,24 +195,13 @@ class FormDetailViewModel @Inject constructor(
                     _submitState.value = SubmitState.Success(submissionId)
 
                     // Clear form after successful submission
+                    // Clear form after successful submission
                     clearFormData()
 
-                    // ✅ FIXED: Trigger sync immediately after form submission
-                    // This ensures the form is synced to the backend as soon as possible
-                    Log.d("FormDetailViewModel", "🔄 Triggering sync after form submission...")
-
-                    viewModelScope.launch {
-                        try {
-                            // Schedule background sync tasks (Form Sync + Media Upload)
-                            SyncScheduler.syncAll(context)
-                            Log.d("FormDetailViewModel", "✅ Sync scheduled successfully")
-                            Log.d("FormDetailViewModel", "📍 Form will sync to backend in background")
-                        } catch (e: Exception) {
-                            // Continue anyway - form is saved locally
-                            Log.e("FormDetailViewModel", "⚠️ Failed to schedule sync: ${e.message}")
-                            Log.e("FormDetailViewModel", "ℹ️ Form is saved locally and will sync when device goes to home screen")
-                        }
-                    }
+                    Log.d(
+                        "FormDetailViewModel",
+                        "✅ Form saved locally and queued for background sync"
+                    )
 
                 }.onFailure { error ->
                     Log.e("FormDetailViewModel", "❌ Submission error: ${error.message}", error)

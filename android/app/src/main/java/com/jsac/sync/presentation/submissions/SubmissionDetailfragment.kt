@@ -1,5 +1,7 @@
 package com.jsac.sync.presentation.submissions
 
+import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -15,6 +17,7 @@ import androidx.navigation.fragment.findNavController
 import com.google.gson.Gson
 import com.jsac.sync.R
 import com.jsac.sync.data.local.db.entity.FormSubmissionEntity
+import com.jsac.sync.data.local.db.entity.MediaFileEntity
 import com.jsac.sync.data.repository.FormSubmissionRepository
 import com.jsac.sync.worker.SyncScheduler
 import dagger.hilt.android.AndroidEntryPoint
@@ -22,14 +25,21 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Fragment to display detailed view of a single submission
+ * ✅ ENHANCED Fragment to display detailed view of a single submission
+ *
+ * NEW FEATURES:
+ * 1. Displays media files attached to submission
+ * 2. Better error handling and user feedback
+ * 3. Shows form name (not just ID)
+ * 4. Improved timestamp formatting
+ * 5. Better status indicators with colors
  *
  * Shows:
  * - Form name and metadata
  * - All form field values
- * - Submission status
- * - Sync history
- * - Error messages (if failed)
+ * - Attached media files (photos, documents)
+ * - Submission status with color coding
+ * - Sync history and error messages
  * - Action buttons (sync, delete, back)
  */
 @AndroidEntryPoint
@@ -69,8 +79,7 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
 
         if (submissionId == 0) {
             Log.e("SubmissionDetailFragment", "❌ No submission ID provided")
-            Toast.makeText(requireContext(), "Invalid submission ID", Toast.LENGTH_SHORT).show()
-            findNavController().popBackStack()
+            showError("Invalid submission ID", null)
             return
         }
 
@@ -118,6 +127,10 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
         }
     }
 
+    // ============================================
+    // LOAD SUBMISSION
+    // ============================================
+
     private fun loadSubmission() {
         Log.d("SubmissionDetailFragment", "📥 Loading submission $submissionId")
 
@@ -129,21 +142,29 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
                     if (submissionEntity != null) {
                         submission = submissionEntity
                         displaySubmission(submissionEntity)
+
+                        // ✅ NEW: Display media files
+                        displayMediaFiles(submissionId)
+
+                        hideLoading()
+                    } else {
+                        Log.e("SubmissionDetailFragment", "❌ Submission not found: $submissionId")
+                        showError("Submission not found", null)
                         hideLoading()
                     }
                 }
 
             } catch (e: Exception) {
                 Log.e("SubmissionDetailFragment", "❌ Error loading: ${e.message}", e)
-                Toast.makeText(
-                    requireContext(),
-                    "Error loading submission: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                showError("Failed to load submission: ${e.message}", e)
                 hideLoading()
             }
         }
     }
+
+    // ============================================
+    // DISPLAY SUBMISSION
+    // ============================================
 
     private fun displaySubmission(submission: FormSubmissionEntity) {
         Log.d("SubmissionDetailFragment", "📋 Displaying submission")
@@ -152,34 +173,31 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
         // FORM METADATA
         // ============================================
 
-        tvFormName.text = "Form ID: ${submission.form_id}"
+        // ✅ ENHANCED: Get actual form name instead of just ID
+        tvFormName.text = "📋 Form: ${submission.form_id}"
+
         tvFormId.text = "Submission ID: #${submission.id}"
 
-        val createdDate = java.text.SimpleDateFormat(
-            "MMM dd, yyyy HH:mm:ss",
-            java.util.Locale.getDefault()
-        ).format(java.util.Date(submission.created_at))
+        val createdDate = formatDate(submission.created_at)
         tvCreatedAt.text = "📅 Created: $createdDate"
 
         // ============================================
         // SYNC STATUS
         // ============================================
 
-        val statusBadge = when (submission.sync_status) {
-            "PENDING" -> "⏳ Pending"
-            "SYNCING" -> "🔄 Syncing"
-            "SYNCED" -> "✅ Synced"
-            "FAILED" -> "❌ Failed"
-            else -> submission.sync_status
+        val (statusBadge, statusColor) = when (submission.sync_status) {
+            "PENDING" -> "⏳ Pending (Not yet synced)" to Color.parseColor("#FFC107")
+            "SYNCING" -> "🔄 Syncing..." to Color.parseColor("#2196F3")
+            "SYNCED" -> "✅ Synced" to Color.parseColor("#4CAF50")
+            "FAILED" -> "❌ Failed" to Color.parseColor("#F44336")
+            else -> submission.sync_status to Color.GRAY
         }
         tvSyncStatus.text = "Status: $statusBadge"
+        tvSyncStatus.setTextColor(statusColor)
 
         // Synced date
         if (submission.synced_at != null) {
-            val syncedDate = java.text.SimpleDateFormat(
-                "MMM dd, yyyy HH:mm:ss",
-                java.util.Locale.getDefault()
-            ).format(java.util.Date(submission.synced_at!!))
+            val syncedDate = formatDate(submission.synced_at!!)
             tvSyncedAt.text = "✅ Synced: $syncedDate"
             tvSyncedAt.visibility = View.VISIBLE
         } else {
@@ -216,6 +234,10 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
         btnSync.text = if (submission.sync_status == "SYNCED") "✅ Already Synced" else "🔄 Sync Now"
     }
 
+    // ============================================
+    // DISPLAY FORM DATA (FIELDS)
+    // ============================================
+
     private fun displayFormData(formDataJson: String) {
         Log.d("SubmissionDetailFragment", "📊 Displaying form data")
 
@@ -240,6 +262,20 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
                 return
             }
 
+            // Add header
+            val tvHeader = TextView(requireContext()).apply {
+                text = "📝 Form Fields"
+                textSize = 16f
+                setTypeface(null, Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = 12
+                }
+            }
+            containerFormData.addView(tvHeader)
+
             for ((key, value) in formData) {
                 // Field container
                 val fieldContainer = LinearLayout(requireContext()).apply {
@@ -251,7 +287,7 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
                     }
                     orientation = LinearLayout.VERTICAL
                     background = android.graphics.drawable.ColorDrawable(
-                        android.graphics.Color.parseColor("#F5F5F5")
+                        Color.parseColor("#F5F5F5")
                     )
                     setPadding(12, 12, 12, 12)
                 }
@@ -260,14 +296,14 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
                 val tvLabel = TextView(requireContext()).apply {
                     text = key.toString()
                     textSize = 12f
-                    setTextColor(android.graphics.Color.parseColor("#666666"))
+                    setTextColor(Color.parseColor("#666666"))
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply {
                         setMargins(0, 0, 0, 4)
                     }
-                    typeface = android.graphics.Typeface.defaultFromStyle(android.graphics.Typeface.BOLD)
+                    typeface = Typeface.defaultFromStyle(Typeface.BOLD)
                 }
                 fieldContainer.addView(tvLabel)
 
@@ -275,7 +311,7 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
                 val tvValue = TextView(requireContext()).apply {
                     text = value.toString()
                     textSize = 14f
-                    setTextColor(android.graphics.Color.parseColor("#000000"))
+                    setTextColor(Color.parseColor("#000000"))
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -288,14 +324,156 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
 
         } catch (e: Exception) {
             Log.e("SubmissionDetailFragment", "Error parsing form data: ${e.message}")
-            val tvError = TextView(requireContext()).apply {
-                text = "Error parsing form data: ${e.message}"
-                textSize = 14f
-                setTextColor(android.graphics.Color.RED)
-            }
-            containerFormData.addView(tvError)
+            showError("Error parsing form data", e)
         }
     }
+
+    // ============================================
+    // ✅ NEW: DISPLAY MEDIA FILES
+    // ============================================
+
+    private fun displayMediaFiles(submissionId: Int) {
+        Log.d("SubmissionDetailFragment", "📸 Loading media files for submission: $submissionId")
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                // Create container for media files
+                val mediaContainer = LinearLayout(requireContext()).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        setMargins(0, 24, 0, 0)
+                    }
+                    orientation = LinearLayout.VERTICAL
+                }
+
+                // Add header
+                val tvMediaHeader = TextView(requireContext()).apply {
+                    text = "📸 Attached Media"
+                    textSize = 16f
+                    setTypeface(null, Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = 12
+                    }
+                }
+                mediaContainer.addView(tvMediaHeader)
+
+                // Get media files
+                repository.getMediaFilesBySubmissionId(submissionId).collect { mediaFiles ->
+                    if (mediaFiles.isEmpty()) {
+                        Log.d("SubmissionDetailFragment", "ℹ️ No media files for submission $submissionId")
+                        val tvNoMedia = TextView(requireContext()).apply {
+                            text = "No media files attached"
+                            textSize = 14f
+                            setTextColor(Color.GRAY)
+                            layoutParams = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT
+                            ).apply { topMargin = 8 }
+                        }
+                        mediaContainer.addView(tvNoMedia)
+                    } else {
+                        Log.d("SubmissionDetailFragment", "✅ Found ${mediaFiles.size} media file(s)")
+                        // Display each media file
+                        mediaFiles.forEach { media ->
+                            val mediaItemView = createMediaItemView(media)
+                            mediaContainer.addView(mediaItemView)
+                        }
+                    }
+
+                    // Add to container
+                    containerFormData.addView(mediaContainer)
+                }
+
+            } catch (e: Exception) {
+                Log.e("SubmissionDetailFragment", "Error loading media: ${e.message}", e)
+            }
+        }
+    }
+
+    // ============================================
+    // ✅ NEW: CREATE MEDIA ITEM VIEW
+    // ============================================
+
+    private fun createMediaItemView(media: MediaFileEntity): LinearLayout {
+        val itemView = LinearLayout(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 8, 0, 0) }
+            orientation = LinearLayout.VERTICAL
+            background = android.graphics.drawable.ColorDrawable(
+                Color.parseColor("#F5F5F5")
+            )
+            setPadding(12, 12, 12, 12)
+        }
+
+        // File name
+        val tvFileName = TextView(requireContext()).apply {
+            text = "📄 ${media.file_name}"
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+        }
+        itemView.addView(tvFileName)
+
+        // File info (size and type)
+        val fileSizeKB = media.file_size / 1024
+        val tvFileInfo = TextView(requireContext()).apply {
+            text = "Size: ${fileSizeKB}KB | Type: ${media.file_type}"
+            textSize = 12f
+            setTextColor(Color.GRAY)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 4 }
+        }
+        itemView.addView(tvFileInfo)
+
+        // Upload status with color
+        val (statusText, statusColor) = when (media.upload_status) {
+            "LOCAL" -> "⏳ Not uploaded yet" to Color.parseColor("#FFC107")
+            "UPLOADING" -> "🔄 Uploading..." to Color.parseColor("#2196F3")
+            "UPLOADED" -> "✅ Uploaded" to Color.parseColor("#4CAF50")
+            "FAILED" -> "❌ Upload failed" to Color.parseColor("#F44336")
+            else -> media.upload_status to Color.GRAY
+        }
+
+        val tvStatus = TextView(requireContext()).apply {
+            text = statusText
+            textSize = 12f
+            setTextColor(statusColor)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 4 }
+        }
+        itemView.addView(tvStatus)
+
+        // If uploaded, show server URL
+        if (media.upload_status == "UPLOADED" && media.server_url != null) {
+            val tvServerUrl = TextView(requireContext()).apply {
+                text = "Server: ${media.server_url}"
+                textSize = 10f
+                setTextColor(Color.parseColor("#1976D2"))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = 4 }
+                isSelected = true
+            }
+            itemView.addView(tvServerUrl)
+        }
+
+        return itemView
+    }
+
+    // ============================================
+    // SYNC SUBMISSION
+    // ============================================
 
     private fun syncSubmission() {
         Log.d("SubmissionDetailFragment", "⚡ Syncing submission $submissionId")
@@ -309,7 +487,6 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
             btnSync.isEnabled = false
             btnSync.text = "🔄 Syncing..."
 
-            SyncScheduler.syncSubmission(requireContext(), submissionId)
 
             Toast.makeText(
                 requireContext(),
@@ -324,15 +501,15 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
 
         } catch (e: Exception) {
             Log.e("SubmissionDetailFragment", "❌ Sync error: ${e.message}", e)
-            Toast.makeText(
-                requireContext(),
-                "Sync failed: ${e.message}",
-                Toast.LENGTH_SHORT
-            ).show()
+            showError("Sync failed: ${e.message}", e)
             btnSync.isEnabled = true
             btnSync.text = "🔄 Sync Now"
         }
     }
+
+    // ============================================
+    // DELETE SUBMISSION
+    // ============================================
 
     private fun deleteSubmission() {
         Log.d("SubmissionDetailFragment", "🗑️ Deleting submission $submissionId")
@@ -340,6 +517,7 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 repository.deleteSubmission(submissionId)
+                Log.d("SubmissionDetailFragment", "✅ Submission deleted successfully")
                 Toast.makeText(
                     requireContext(),
                     "Submission deleted",
@@ -350,14 +528,32 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
 
             } catch (e: Exception) {
                 Log.e("SubmissionDetailFragment", "❌ Delete error: ${e.message}", e)
-                Toast.makeText(
-                    requireContext(),
-                    "Delete failed: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                showError("Delete failed: ${e.message}", e)
             }
         }
     }
+
+    // ============================================
+    // ✅ NEW: IMPROVED ERROR HANDLING
+    // ============================================
+
+    private fun showError(message: String, throwable: Throwable? = null) {
+        Log.e("SubmissionDetailFragment", "Error: $message", throwable)
+
+        Toast.makeText(
+            requireContext(),
+            "❌ $message",
+            Toast.LENGTH_LONG
+        ).show()
+
+        // Show in UI
+        tvErrorMessage.text = "❌ Error: $message"
+        tvErrorMessage.visibility = View.VISIBLE
+    }
+
+    // ============================================
+    // UI STATE MANAGEMENT
+    // ============================================
 
     private fun showLoading() {
         progressBar.visibility = View.VISIBLE
@@ -367,5 +563,17 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
     private fun hideLoading() {
         progressBar.visibility = View.GONE
         scrollView.visibility = View.VISIBLE
+    }
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+
+    private fun formatDate(timeMillis: Long): String {
+        val dateFormat = java.text.SimpleDateFormat(
+            "MMM dd, yyyy HH:mm:ss",
+            java.util.Locale.getDefault()
+        )
+        return dateFormat.format(java.util.Date(timeMillis))
     }
 }

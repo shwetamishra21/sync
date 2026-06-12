@@ -19,8 +19,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.jsac.sync.R
-import com.jsac.sync.presentation.submissions.SubmissionsAdapter
-import com.jsac.sync.worker.SyncScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -260,7 +258,6 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
 
     private fun showError(message: String) {
         Log.e("SubmissionsListFragment", "🚨 Error: $message")
-
         rvSubmissions.visibility = View.GONE
         containerEmpty.visibility = View.VISIBLE
         tvEmpty.text = "Error: $message"
@@ -269,55 +266,21 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
     }
 
     private fun syncSubmission(submissionId: Int) {
-        Log.d("SubmissionsListFragment", "⚡ Syncing submission: $submissionId")
-
-        try {
-            SyncScheduler.syncSubmission(requireContext(), submissionId)
-            Toast.makeText(
-                requireContext(),
-                "Sync started for submission #$submissionId",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            // Refresh after a short delay
-            swipeRefresh.postDelayed({
-                viewModel.refreshSubmissions(currentFilter)
-            }, 1000)
-
-        } catch (e: Exception) {
-            Log.e("SubmissionsListFragment", "❌ Sync error: ${e.message}", e)
-            Toast.makeText(
-                requireContext(),
-                "Sync failed: ${e.message}",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
+        Toast.makeText(
+            requireContext(),
+            "Manual sync is not available",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun syncAllPending() {
-        Log.d("SubmissionsListFragment", "🚀 Syncing all pending submissions")
+        Toast.makeText(
+            requireContext(),
+            "Sync functionality is not available",
+            Toast.LENGTH_SHORT
+        ).show()
 
-        try {
-            SyncScheduler.syncAll(requireContext())
-            Toast.makeText(
-                requireContext(),
-                "Sync started for all pending submissions",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            // Refresh after a short delay
-            swipeRefresh.postDelayed({
-                viewModel.refreshSubmissions(currentFilter)
-            }, 2000)
-
-        } catch (e: Exception) {
-            Log.e("SubmissionsListFragment", "❌ Sync error: ${e.message}", e)
-            Toast.makeText(
-                requireContext(),
-                "Sync failed: ${e.message}",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
+        viewModel.refreshSubmissions(currentFilter)
     }
 
     private fun deleteSubmission(submissionId: Int) {
@@ -344,7 +307,6 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
             }
         }
     }
-
     override fun onResume() {
         super.onResume()
         Log.d("SubmissionsListFragment", "👀 onResume - Refreshing")
