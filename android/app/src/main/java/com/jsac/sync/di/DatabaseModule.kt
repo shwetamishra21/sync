@@ -5,7 +5,6 @@ import com.jsac.sync.data.local.db.AppDatabase
 import com.jsac.sync.data.local.db.dao.FormDao
 import com.jsac.sync.data.local.db.dao.FormSubmissionDao
 import com.jsac.sync.data.local.db.dao.MediaFileDao
-import com.jsac.sync.data.local.db.dao.SyncQueueDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

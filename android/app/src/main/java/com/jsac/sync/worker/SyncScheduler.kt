@@ -47,13 +47,17 @@ object SyncScheduler {
                 .addTag(WORK_TAG)
                 .build()
 
+            // ✅ REPLACE: Use unique name with timestamp to allow queuing
+            val uniqueWorkName = "form_sync_batch_${System.currentTimeMillis() / 60000}"  // One per minute
+
             WorkManager.getInstance(context).enqueueUniqueWork(
-                WORK_NAME_ALL,
-                ExistingWorkPolicy.KEEP, // don't duplicate if already running
+                uniqueWorkName,
+                ExistingWorkPolicy.KEEP,  // Only keeps if SAME minute (prevents rapid duplicates)
                 syncRequest
             )
 
-            Log.d("SyncScheduler", "✅ Full sync scheduled")
+            Log.d("SyncScheduler", "✅ Full sync scheduled: $uniqueWorkName")
+
         } catch (e: Exception) {
             Log.e("SyncScheduler", "❌ Error scheduling sync: ${e.message}", e)
         }

@@ -101,18 +101,23 @@ class FormSubmissionRepository @Inject constructor(
             val formData: Map<String, String> = try {
                 Log.d("FormSubmissionRepository", "   📄 Parsing form_data JSON...")
                 val parsed = gson.fromJson(submission.form_data, Map::class.java) as Map<String, String>
+
+                if (parsed.isEmpty()) {
+                    Log.w("FormSubmissionRepository", "   ⚠️ Form data is empty after parsing!")
+                    return Result.failure(Exception("Form data is empty or malformed"))
+                }
+
                 Log.d("FormSubmissionRepository", "   ✅ Parsed ${parsed.size} fields")
                 parsed
-            } catch (e: Exception) {
-                Log.e("FormSubmissionRepository", "   ❌ JSON parsing failed: ${e.message}")
-                Log.e("FormSubmissionRepository", "   🔍 Raw data (first 200 chars):")
-                Log.e("FormSubmissionRepository", "      ${submission.form_data.take(200)}")
-                emptyMap()
-            }
 
-            if (formData.isEmpty()) {
-                Log.w("FormSubmissionRepository", "   ⚠️ WARNING: Form data is empty!")
-                Log.w("FormSubmissionRepository", "   This might cause API validation errors")
+            } catch (e: Exception) {
+                Log.e("FormSubmissionRepository", "   ❌ JSON parsing FAILED: ${e.message}", e)
+                Log.e("FormSubmissionRepository", "   Raw data (first 300 chars): ${submission.form_data.take(300)}")
+
+                // ✅ RETURN FAILURE INSTEAD OF EMPTY MAP
+                return Result.failure(
+                    Exception("Cannot parse form_data JSON: ${e.message}")
+                )
             }
 
             // Create request

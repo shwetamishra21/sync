@@ -9,12 +9,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.jsac.sync.data.local.db.dao.FormDao
 import com.jsac.sync.data.local.db.dao.FormSubmissionDao
 import com.jsac.sync.data.local.db.dao.MediaFileDao
-import com.jsac.sync.data.local.db.dao.SyncQueueDao
 import com.jsac.sync.data.local.db.entity.FormEntity
 import com.jsac.sync.data.local.db.entity.FormFieldEntity
 import com.jsac.sync.data.local.db.entity.FormSubmissionEntity
 import com.jsac.sync.data.local.db.entity.MediaFileEntity
-import com.jsac.sync.data.local.db.entity.SyncQueueEntity
+
 
 /**
  * Room Database for JSAC Sync
@@ -33,10 +32,9 @@ import com.jsac.sync.data.local.db.entity.SyncQueueEntity
         FormEntity::class,
         FormFieldEntity::class,
         FormSubmissionEntity::class,
-        MediaFileEntity::class,
-        SyncQueueEntity::class
+        MediaFileEntity::class
     ],
-    version = 4,
+    version = 4,  // ← INCREMENT VERSION
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -44,7 +42,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun formDao(): FormDao
     abstract fun formSubmissionDao(): FormSubmissionDao
     abstract fun mediaFileDao(): MediaFileDao
-    abstract fun syncQueueDao(): SyncQueueDao
+
 
     companion object {
         @Volatile

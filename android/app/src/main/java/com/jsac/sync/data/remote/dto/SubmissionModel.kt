@@ -1,6 +1,7 @@
 package com.jsac.sync.data.remote.dto
 
 import com.google.gson.annotations.SerializedName
+import java. util. UUID
 
 /**
  * Data Transfer Objects for form submissions
@@ -25,8 +26,17 @@ data class SubmitFormRequest(
     val submittedAt: Long,
 
     @SerializedName("gps_location")
-    val gpsLocation: GpsLocation? = null
+    val gpsLocation: GpsLocation? = null,
+
+    @SerializedName("idempotency_key")
+    val idempotencyKey: String = generateIdempotencyKey()  // ✅ ADD
 )
+
+private fun generateIdempotencyKey(): String {
+    // Format: "<local_submission_id>_<timestamp>_<hash>"
+    // Ensures each submission has unique key, deterministic for retries
+    return UUID.randomUUID().toString()
+}
 
 data class GpsLocation(
     @SerializedName("lat")

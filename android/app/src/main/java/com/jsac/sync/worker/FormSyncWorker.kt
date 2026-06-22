@@ -103,7 +103,23 @@ class FormSyncWorker @AssistedInject constructor(
                         submissionRepository.updateSubmissionStatus(submission.id, SyncStatus.SYNCING)
                         Log.d("FormSyncWorker", "   ✅ Status updated to SYNCING")
                     } catch (e: Exception) {
-                        Log.e("FormSyncWorker", "   ⚠️ Failed to mark as SYNCING: ${e.message}")
+                        Log.e("FormSyncWorker", "   ❌ CRITICAL: Failed to mark as SYNCING")
+
+                        // ✅ ABORT THIS SUBMISSION, TRY AGAIN LATER
+                        failureCount++
+                        failedSubmissions.add(Pair(submission.id, "Cannot update status: ${e.message}"))
+
+                        // Log critical error
+                        try {
+                            submissionRepository.markAsFailed(
+                                submission.id,
+                                "Worker failed to update status to SYNCING: ${e.message}"
+                            )
+                        } catch (updateError: Exception) {
+                            Log.e("FormSyncWorker", "   ❌ Also failed to mark as FAILED: ${updateError.message}")
+                        }
+
+                        continue  // ← SKIP THIS SUBMISSION, DON'T CALL API
                     }
 
                     val result = syncToServer(submission, token)
