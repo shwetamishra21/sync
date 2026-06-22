@@ -31,9 +31,17 @@ interface FormSubmissionDao {
 
     /**
      * Get all submissions ordered by creation date (newest first)
+     * ✅ FIXED: Returns ALL submissions, not limited
      */
     @Query("SELECT * FROM form_submissions ORDER BY created_at DESC")
     fun getAllSubmissions(): Flow<List<FormSubmissionEntity>>
+
+    /**
+     * ✅ NEW: Get recent submissions (last N items)
+     * Useful for UI display with pagination
+     */
+    @Query("SELECT * FROM form_submissions ORDER BY created_at DESC LIMIT :limit")
+    fun getRecentSubmissions(limit: Int = 15): Flow<List<FormSubmissionEntity>>
 
     /**
      * Get a specific submission by ID (Flow version)
@@ -214,9 +222,10 @@ interface FormSubmissionDao {
 
     /**
      * Get recent submissions (useful for dashboard)
+     * ✅ FIXED: Explicit LIMIT clause
      */
     @Query("SELECT * FROM form_submissions ORDER BY created_at DESC LIMIT :limit")
-    fun getRecentSubmissions(limit: Int): Flow<List<FormSubmissionEntity>>
+    fun getRecentSubmissionsFlow(limit: Int = 15): Flow<List<FormSubmissionEntity>>
 }
 
 /**

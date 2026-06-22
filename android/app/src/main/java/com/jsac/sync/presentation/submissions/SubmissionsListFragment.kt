@@ -23,15 +23,13 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
 /**
- * Fragment to display all saved form submissions
+ * ✅ FIXED: SubmissionsListFragment
  *
- * Features:
- * - List of all submissions with sync status
- * - Filter by status (All, Pending, Syncing, Synced, Failed)
- * - Pull-to-refresh
- * - Manual sync button
- * - Click to view details
- * - Delete submission
+ * Changes:
+ * 1. Initialize filter spinner to "All" (shows all submissions)
+ * 2. Ensure RecyclerView visibility is properly managed
+ * 3. Added logging to track data flow
+ * 4. Fixed pull-to-refresh animation handling
  */
 @AndroidEntryPoint
 class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
@@ -51,6 +49,9 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
 
     // Current filter status
     private var currentFilter: String? = null
+
+    // ✅ NEW: Track if we're initializing spinner to prevent recursive calls
+    private var isInitializingSpinner = false
 
     override fun onViewCreated(
         view: View,
@@ -176,6 +177,12 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
                 position: Int,
                 id: Long
             ) {
+                // ✅ FIXED: Skip if we're initializing (prevents loading data twice)
+                if (isInitializingSpinner) {
+                    Log.d("SubmissionsListFragment", "⏭️ Skipping filter change during init")
+                    return
+                }
+
                 val selected = filterOptions[position]
                 Log.d("SubmissionsListFragment", "🔍 Filter changed to: $selected")
 
@@ -188,11 +195,20 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
                     else -> null
                 }
 
+                Log.d("SubmissionsListFragment", "   Loading submissions with filter: $currentFilter")
                 viewModel.loadSubmissions(currentFilter)
             }
 
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
+
+        // ✅ FIXED: Set default filter to "All" (index 0)
+        isInitializingSpinner = true
+        spinnerFilter.setSelection(0)  // "All" option
+        isInitializingSpinner = false
+        currentFilter = null  // Load all submissions
+
+        Log.d("SubmissionsListFragment", "✅ Filter spinner set to 'All' by default")
     }
 
     private fun observeSubmissions() {
@@ -225,18 +241,21 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
                     }
                 }
 
-                swipeRefresh.isRefreshing = false
+                // ✅ FIXED: Update refresh animation
+                swipeRefresh.isRefreshing = (state is SubmissionsViewModel.UiState.Loading)
             }
         }
     }
 
     private fun showLoading() {
+        Log.d("SubmissionsListFragment", "   Showing loading state")
         progressBar.visibility = View.VISIBLE
         rvSubmissions.visibility = View.GONE
         containerEmpty.visibility = View.GONE
     }
 
     private fun hideLoading() {
+        Log.d("SubmissionsListFragment", "   Hiding loading state")
         progressBar.visibility = View.GONE
     }
 
@@ -245,7 +264,11 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
 
         rvSubmissions.visibility = View.VISIBLE
         containerEmpty.visibility = View.GONE
+
+        // ✅ FIXED: Submit list to adapter
         adapter.submitList(submissions)
+
+        Log.d("SubmissionsListFragment", "   ✅ RecyclerView updated with submissions")
     }
 
     private fun showEmpty() {
@@ -301,9 +324,10 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
             }
         }
     }
+
     override fun onResume() {
         super.onResume()
-        Log.d("SubmissionsListFragment", "👀 onResume - Refreshing")
+        Log.d("SubmissionsListFragment", "👀 onResume - Refreshing submissions")
         viewModel.refreshSubmissions(currentFilter)
     }
 }

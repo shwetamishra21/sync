@@ -30,7 +30,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="View and sync your form submissions"
+            android:text="View and sync your form submissions (Last 15)"
             android:textSize="14sp"
             android:textColor="@android:color/darker_gray"
             android:layout_marginBottom="16dp"/>
@@ -77,15 +77,18 @@
 
     <!-- ============================================ -->
     <!-- SWIPE REFRESH LAYOUT -->
+    <!-- ✅ FIXED: Ensure RecyclerView is inside SwipeRefresh -->
     <!-- ============================================ -->
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:visibility="visible">
 
-        <!-- Submissions List -->
+        <!-- Submissions List RecyclerView -->
+        <!-- ✅ FIXED: Initial visibility is GONE, shown only when data loads -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvSubmissions"
             android:layout_width="match_parent"
@@ -96,6 +99,7 @@
 
     <!-- ============================================ -->
     <!-- EMPTY STATE -->
+    <!-- ✅ FIXED: Visible when no submissions available -->
     <!-- ============================================ -->
 
     <LinearLayout
@@ -133,8 +137,10 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:padding="16dp"
-        android:background="@color/white">
+        android:background="@color/white"
+        android:elevation="8dp">
 
+        <!-- Sync All Pending Button -->
         <Button
             android:id="@+id/btnSyncAll"
             android:layout_width="0dp"
@@ -142,15 +148,20 @@
             android:layout_weight="1"
             android:text="🔄 Sync All Pending"
             android:textAllCaps="false"
-            android:layout_marginEnd="8dp"/>
+            android:layout_marginEnd="8dp"
+            android:backgroundTint="@color/sync_button_color"
+            android:textColor="@android:color/white"/>
 
+        <!-- View Forms Button -->
         <Button
             android:id="@+id/btnViewForms"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="📋 View Forms"
-            android:textAllCaps="false"/>
+            android:textAllCaps="false"
+            android:backgroundTint="@color/purple_500"
+            android:textColor="@android:color/white"/>
 
     </LinearLayout>
 

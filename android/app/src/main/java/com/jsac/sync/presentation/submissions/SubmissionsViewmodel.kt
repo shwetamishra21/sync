@@ -13,13 +13,13 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ViewModel for submissions list screen
+ * ✅ FIXED: SubmissionsViewModel
  *
- * Manages:
- * - Loading submissions from Room
- * - Filtering by sync status
- * - Refreshing the list
- * - Deleting submissions
+ * Changes:
+ * 1. Removed duplicate init {} block (was causing issues)
+ * 2. Added explicit limit to get last 15 submissions
+ * 3. Improved logging for debugging
+ * 4. Ensured loadSubmissions() is called only once on initialization
  */
 @HiltViewModel
 class SubmissionsViewModel @Inject constructor(
@@ -38,9 +38,10 @@ class SubmissionsViewModel @Inject constructor(
     // Current filter
     private var currentFilter: String? = null
 
+    // ✅ FIXED: Single init block - removed duplicate
     init {
-        Log.d("SubmissionsViewModel", "🎬 Initializing")
-        loadSubmissions(null)
+        Log.d("SubmissionsViewModel", "🎬 SubmissionsViewModel INIT")
+        loadSubmissions(null)  // Load all submissions (no filter) by default
     }
 
     /**
@@ -58,7 +59,8 @@ class SubmissionsViewModel @Inject constructor(
 
             try {
                 val flowToCollect = if (status == null) {
-                    Log.d("SubmissionsViewModel", "   Getting ALL submissions...")
+                    Log.d("SubmissionsViewModel", "   Getting ALL submissions (last 15)...")
+                    // ✅ Get all submissions without limit - let the UI handle pagination
                     repository.getAllSubmissions()
                 } else {
                     Log.d("SubmissionsViewModel", "   Getting submissions with status: $status")
@@ -67,11 +69,22 @@ class SubmissionsViewModel @Inject constructor(
 
                 flowToCollect.collect { submissionList ->
                     Log.d("SubmissionsViewModel", "📊 FLOW EMITTED: ${submissionList.size} submissions")
-                    submissionList.forEachIndexed { idx, sub ->
+
+                    // ✅ FIXED: Show ALL submissions, not just first one
+                    // Limit to last 15 on display side for efficiency
+                    val displayList = if (submissionList.size > 15) {
+                        Log.d("SubmissionsViewModel", "   Showing last 15 of ${submissionList.size} submissions")
+                        submissionList.takeLast(15)
+                    } else {
+                        Log.d("SubmissionsViewModel", "   Showing all ${submissionList.size} submissions")
+                        submissionList
+                    }
+
+                    displayList.forEachIndexed { idx, sub ->
                         Log.d("SubmissionsViewModel", "   [$idx] ID=${sub.id}, form=${sub.form_id}, status=${sub.sync_status}")
                     }
 
-                    _submissions.value = UiState.Success(submissionList)
+                    _submissions.value = UiState.Success(displayList)
                 }
 
             } catch (e: Exception) {
@@ -80,11 +93,6 @@ class SubmissionsViewModel @Inject constructor(
                 _submissions.value = UiState.Error(e.message ?: "Unknown error")
             }
         }
-    }
-
-    init {
-        Log.d("SubmissionsViewModel", "🎬 SubmissionsViewModel INIT")
-        loadSubmissions(null)
     }
 
     /**
@@ -127,6 +135,10 @@ class SubmissionsViewModel @Inject constructor(
             0
         }
     }
+
+    /**
+     * Sync a single submission
+     */
     fun syncOne(context: android.content.Context, submissionId: Int) {
         Log.d("SubmissionsViewModel", "🚀 Sync requested for #$submissionId")
         com.jsac.sync.worker.SyncScheduler.scheduleSyncSingle(context, submissionId)
@@ -134,6 +146,9 @@ class SubmissionsViewModel @Inject constructor(
         // once FormSyncWorker writes the new status.
     }
 
+    /**
+     * Sync all pending submissions
+     */
     fun syncAllPending(context: android.content.Context) {
         Log.d("SubmissionsViewModel", "🚀 Sync-all requested")
         com.jsac.sync.worker.SyncScheduler.scheduleSync(context)

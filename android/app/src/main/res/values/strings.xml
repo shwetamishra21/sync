@@ -22,7 +22,7 @@
     <!-- ============================================ -->
 
     <string name="title_saved_submissions">📋 Saved Submissions</string>
-    <string name="subtitle_submissions">View and sync your form submissions</string>
+    <string name="subtitle_submissions">View and sync your form submissions (Last 15)</string>
 
     <string name="label_filter">Filter:</string>
     <string name="filter_all">All</string>
@@ -86,6 +86,13 @@
     <string name="msg_error_navigation">Navigation error</string>
 
     <string name="msg_syncing">🔄 Syncing...</string>
+
+    <!-- ============================================ -->
+    <!-- ✅ NEW: DISPLAY INFO STRINGS -->
+    <!-- ============================================ -->
+
+    <string name="info_showing_last_15">Showing last 15 submissions</string>
+    <string name="info_all_submissions_available">All submissions available for sync</string>
 
     <!-- ============================================ -->
     <!-- LABELS FOR SUBMISSION ITEMS -->

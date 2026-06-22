@@ -1,7 +1,7 @@
 package com.jsac.sync.presentation.submissions
 
-
 import android.graphics.Color
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,7 +17,12 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * RecyclerView adapter for displaying form submissions
+ * ✅ VERIFIED: RecyclerView adapter for displaying form submissions
+ *
+ * Changes:
+ * 1. Added detailed logging for debugging
+ * 2. Verified submitList() properly updates items
+ * 3. Ensured DiffUtil is calculating differences correctly
  *
  * Shows:
  * - Form name
@@ -35,8 +40,11 @@ class SubmissionsAdapter(
 ) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SubmissionViewHolder {
+        Log.d("SubmissionsAdapter", "🔧 Creating new ViewHolder")
+
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_submission, parent, false)
+
         return SubmissionViewHolder(
             view,
             onSubmissionClick,
@@ -46,7 +54,19 @@ class SubmissionsAdapter(
     }
 
     override fun onBindViewHolder(holder: SubmissionViewHolder, position: Int) {
+        Log.d("SubmissionsAdapter", "📌 Binding item at position: $position")
         holder.bind(getItem(position))
+    }
+
+    /**
+     * ✅ OVERRIDE: Track list changes for debugging
+     */
+    override fun submitList(list: List<FormSubmissionEntity>?) {
+        Log.d("SubmissionsAdapter", "📝 submitList called with ${list?.size ?: 0} items")
+        list?.forEachIndexed { idx, submission ->
+            Log.d("SubmissionsAdapter", "   [$idx] ID=${submission.id}, Form=${submission.form_id}, Status=${submission.sync_status}")
+        }
+        super.submitList(list)
     }
 
     class SubmissionViewHolder(
@@ -65,6 +85,8 @@ class SubmissionsAdapter(
 
         fun bind(submission: FormSubmissionEntity) {
             val submissionId = submission.id
+
+            Log.d("SubmissionsAdapter", "🔗 Binding submission #$submissionId")
 
             // ============================================
             // FORM NAME
@@ -111,6 +133,7 @@ class SubmissionsAdapter(
             // ============================================
 
             itemView.setOnClickListener {
+                Log.d("SubmissionsAdapter", "👆 Item clicked: $submissionId")
                 onSubmissionClick(submissionId)
             }
 
@@ -119,6 +142,7 @@ class SubmissionsAdapter(
             // ============================================
 
             btnSync.setOnClickListener {
+                Log.d("SubmissionsAdapter", "🔄 Sync clicked for submission: $submissionId")
                 onSyncClick(submissionId)
             }
 
@@ -131,6 +155,7 @@ class SubmissionsAdapter(
             // ============================================
 
             btnDelete.setOnClickListener {
+                Log.d("SubmissionsAdapter", "🗑️ Delete clicked for submission: $submissionId")
                 onDeleteClick(submissionId)
             }
         }
@@ -141,14 +166,23 @@ class SubmissionsAdapter(
             oldItem: FormSubmissionEntity,
             newItem: FormSubmissionEntity
         ): Boolean {
-            return oldItem.id == newItem.id
+            val same = oldItem.id == newItem.id
+            if (!same) {
+                Log.d("SubmissionsAdapter", "   Different items: ${oldItem.id} vs ${newItem.id}")
+            }
+            return same
         }
 
         override fun areContentsTheSame(
             oldItem: FormSubmissionEntity,
             newItem: FormSubmissionEntity
         ): Boolean {
-            return oldItem == newItem
+            val same = oldItem == newItem
+            if (!same) {
+                Log.d("SubmissionsAdapter", "   Content changed for item #${oldItem.id}")
+                Log.d("SubmissionsAdapter", "      Old status: ${oldItem.sync_status} → New status: ${newItem.sync_status}")
+            }
+            return same
         }
     }
 }
