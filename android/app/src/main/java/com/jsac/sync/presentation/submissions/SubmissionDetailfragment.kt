@@ -113,7 +113,7 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
 
         btnSync.setOnClickListener {
             Log.d("SubmissionDetailFragment", "⚡ Sync button clicked")
-            syncSubmission()
+
         }
 
         btnDelete.setOnClickListener {
@@ -475,37 +475,7 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
     // SYNC SUBMISSION
     // ============================================
 
-    private fun syncSubmission() {
-        Log.d("SubmissionDetailFragment", "⚡ Syncing submission $submissionId")
 
-        if (submission == null) {
-            Toast.makeText(requireContext(), "Submission not loaded", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        try {
-            btnSync.isEnabled = false
-            btnSync.text = "🔄 Syncing..."
-
-
-            Toast.makeText(
-                requireContext(),
-                "Sync started for submission #$submissionId",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            // Reload after a delay
-            view?.postDelayed({
-                loadSubmission()
-            }, 1000)
-
-        } catch (e: Exception) {
-            Log.e("SubmissionDetailFragment", "❌ Sync error: ${e.message}", e)
-            showError("Sync failed: ${e.message}", e)
-            btnSync.isEnabled = true
-            btnSync.text = "🔄 Sync Now"
-        }
-    }
 
     // ============================================
     // DELETE SUBMISSION

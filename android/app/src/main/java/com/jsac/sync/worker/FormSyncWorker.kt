@@ -20,15 +20,15 @@ import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 
 /**
- * ✅ OPTIMIZED: Single sync worker for all pending form submissions
+ * ✅ ENHANCED: Sync worker with improved error logging and diagnostics
  *
  * Key Improvements:
  * 1. Gets token ONCE at start (not per request)
- * 2. Proper error handling and logging
+ * 2. Comprehensive error logging with stack traces
  * 3. Marks submissions as SYNCED only on actual success
  * 4. Tracks retry attempts with detailed logging
- * 5. Returns retry on partial failure (some succeeded, some failed)
- * 6. Clear separation of concerns
+ * 5. Returns retry on partial failure
+ * 6. Logs exact error messages from API
  *
  * Flow:
  * 1. Get pending submissions from Room (status = PENDING or SYNCING)
@@ -58,27 +58,49 @@ class FormSyncWorker @AssistedInject constructor(
 
         return@runBlocking try {
             // ✅ STEP 1: Get token once (not per request)
+            Log.d("FormSyncWorker", "")
+            Log.d("FormSyncWorker", "🔐 Authenticating...")
+
             val token = try {
                 sessionManager.token.first()
             } catch (e: Exception) {
                 Log.e("FormSyncWorker", "❌ Failed to get token: ${e.message}")
+                Log.e("FormSyncWorker", "   Exception type: ${e.javaClass.simpleName}")
+                e.printStackTrace()
                 return@runBlocking Result.retry()
             }
 
             if (token.isNullOrEmpty()) {
-                Log.e("FormSyncWorker", "❌ Token is empty - user may not be logged in")
-                Log.e("FormSyncWorker", "⏳ Retrying later (maybe user logs in)")
+                Log.e("FormSyncWorker", "❌ Token is null/empty after retrieval")
+                Log.e("FormSyncWorker", "   This usually means user is not logged in")
+                Log.e("FormSyncWorker", "   Submission will remain PENDING")
+                Log.e("FormSyncWorker", "⏳ Retrying later (user may login then)")
                 return@runBlocking Result.retry()
             }
 
-            Log.d("FormSyncWorker", "✅ Token obtained (length: ${token.length})")
+            Log.d("FormSyncWorker", "✅ Token obtained successfully")
+            Log.d("FormSyncWorker", "   Token length: ${token.length} characters")
+            Log.d("FormSyncWorker", "   Preview: ${token.take(20)}...${token.takeLast(10)}")
 
             // ✅ STEP 2: Get pending submissions
-            val pendingSubmissions = submissionRepository.getPendingSyncSubmissions(limit = 10)
+            Log.d("FormSyncWorker", "")
+            Log.d("FormSyncWorker", "📦 Checking for pending submissions...")
+
+            val pendingSubmissions = try {
+                submissionRepository.getPendingSyncSubmissions(limit = 10)
+            } catch (e: Exception) {
+                Log.e("FormSyncWorker", "❌ Failed to get submissions: ${e.message}")
+                e.printStackTrace()
+                return@runBlocking Result.retry()
+            }
 
             if (pendingSubmissions.isEmpty()) {
                 Log.d("FormSyncWorker", "✅ No pending submissions to sync")
+                Log.d("FormSyncWorker", "")
                 Log.d("FormSyncWorker", "🔄 ═══════════════════════════════════════════════════")
+                Log.d("FormSyncWorker", "✅ SYNC COMPLETE - Nothing to do")
+                Log.d("FormSyncWorker", "🔄 ═══════════════════════════════════════════════════")
+                Log.d("FormSyncWorker", "")
                 return@runBlocking Result.success()
             }
 
@@ -87,54 +109,73 @@ class FormSyncWorker @AssistedInject constructor(
 
             var successCount = 0
             var failureCount = 0
-            val failedSubmissions = mutableListOf<String>()
+            val failedSubmissions = mutableListOf<Pair<Int, String>>()
 
             // ✅ STEP 3: Sync each submission
-            for (submission in pendingSubmissions) {
+            for ((index, submission) in pendingSubmissions.withIndex()) {
                 try {
                     Log.d("FormSyncWorker", "")
-                    Log.d("FormSyncWorker", "📋 Syncing submission #${submission.id}")
+                    Log.d("FormSyncWorker", "📋 [${index + 1}/${pendingSubmissions.size}] Syncing submission #${submission.id}")
                     Log.d("FormSyncWorker", "   Form: ${submission.form_id}")
                     Log.d("FormSyncWorker", "   Current status: ${submission.sync_status}")
+                    Log.d("FormSyncWorker", "   Created: ${submission.created_at}")
 
                     // Mark as SYNCING
-                    submissionRepository.updateSubmissionStatus(
-                        submission.id,
-                        SyncStatus.SYNCING
-                    )
-                    Log.d("FormSyncWorker", "   → Marked as SYNCING")
+                    try {
+                        submissionRepository.updateSubmissionStatus(
+                            submission.id,
+                            SyncStatus.SYNCING
+                        )
+                        Log.d("FormSyncWorker", "   ✅ Status updated to SYNCING")
+                    } catch (e: Exception) {
+                        Log.e("FormSyncWorker", "   ⚠️ Failed to mark as SYNCING: ${e.message}")
+                    }
 
                     // Call API with token
                     val result = syncToServer(submission, token)
 
                     if (result) {
                         // Mark as SYNCED
-                        submissionRepository.markAsSynced(submission.id)
-                        Log.d("FormSyncWorker", "   ✅ SYNCED successfully")
-                        successCount++
+                        try {
+                            submissionRepository.markAsSynced(submission.id)
+                            Log.d("FormSyncWorker", "   ✅ SYNCED successfully")
+                            Log.d("FormSyncWorker", "   📊 Status in DB: SYNCED")
+                            successCount++
+                        } catch (e: Exception) {
+                            Log.e("FormSyncWorker", "   ⚠️ Failed to mark as SYNCED: ${e.message}")
+                        }
                     } else {
                         // Mark as FAILED (will retry next time)
-                        submissionRepository.markAsFailed(
-                            submission.id,
-                            "Network error or server rejected"
-                        )
-                        Log.e("FormSyncWorker", "   ❌ FAILED - will retry later")
-                        failureCount++
-                        failedSubmissions.add("#${submission.id}")
+                        try {
+                            submissionRepository.markAsFailed(
+                                submission.id,
+                                "Sync returned false - check logs for details"
+                            )
+                            Log.e("FormSyncWorker", "   ❌ FAILED - will retry later")
+                            Log.e("FormSyncWorker", "   📊 Status in DB: FAILED")
+                            failureCount++
+                            failedSubmissions.add(Pair(submission.id, "Sync returned false"))
+                        } catch (e: Exception) {
+                            Log.e("FormSyncWorker", "   ⚠️ Failed to mark as FAILED: ${e.message}")
+                        }
                     }
 
                 } catch (e: Exception) {
-                    Log.e("FormSyncWorker", "   ❌ Exception: ${e.message}", e)
+                    Log.e("FormSyncWorker", "   ❌ Exception during sync: ${e.message}")
+                    Log.e("FormSyncWorker", "   Type: ${e.javaClass.simpleName}")
+                    e.printStackTrace()
+
                     try {
                         submissionRepository.markAsFailed(
                             submission.id,
-                            e.message ?: "Unknown error"
+                            "Exception: ${e.message}"
                         )
                     } catch (updateError: Exception) {
                         Log.e("FormSyncWorker", "   Error updating status: ${updateError.message}")
                     }
+
                     failureCount++
-                    failedSubmissions.add("#${submission.id}")
+                    failedSubmissions.add(Pair(submission.id, e.message ?: "Unknown error"))
                 }
             }
 
@@ -144,9 +185,13 @@ class FormSyncWorker @AssistedInject constructor(
             Log.d("FormSyncWorker", "📊 SYNC SUMMARY")
             Log.d("FormSyncWorker", "   ✅ Successful: $successCount")
             Log.d("FormSyncWorker", "   ❌ Failed: $failureCount")
+            Log.d("FormSyncWorker", "   📈 Success rate: ${if (pendingSubmissions.isNotEmpty()) (successCount * 100) / pendingSubmissions.size else 0}%")
 
             if (failedSubmissions.isNotEmpty()) {
-                Log.d("FormSyncWorker", "   Failed IDs: ${failedSubmissions.joinToString(", ")}")
+                Log.d("FormSyncWorker", "   Failed submissions:")
+                failedSubmissions.forEach { (id, reason) ->
+                    Log.d("FormSyncWorker", "      • #$id: $reason")
+                }
             }
 
             Log.d("FormSyncWorker", "🔄 ═══════════════════════════════════════════════════")
@@ -154,22 +199,33 @@ class FormSyncWorker @AssistedInject constructor(
             // Return result
             when {
                 failureCount == 0 -> {
-                    Log.d("FormSyncWorker", "✅ All submissions synced! Sync complete.")
+                    Log.d("FormSyncWorker", "✅ ALL SUBMISSIONS SYNCED - Work complete")
+                    Log.d("FormSyncWorker", "🔄 ═══════════════════════════════════════════════════")
+                    Log.d("FormSyncWorker", "")
                     Result.success()
                 }
                 successCount > 0 && failureCount > 0 -> {
-                    Log.w("FormSyncWorker", "⏳ Partial success - retrying failed submissions")
+                    Log.w("FormSyncWorker", "⏳ PARTIAL SUCCESS - Retrying failed submissions")
+                    Log.d("FormSyncWorker", "🔄 ═══════════════════════════════════════════════════")
+                    Log.d("FormSyncWorker", "")
                     Result.retry()
                 }
                 else -> {
-                    Log.w("FormSyncWorker", "⏳ All failed - will retry with exponential backoff")
+                    Log.w("FormSyncWorker", "⏳ ALL FAILED - Will retry with exponential backoff")
+                    Log.d("FormSyncWorker", "   Next attempt in: 5-10 minutes")
+                    Log.d("FormSyncWorker", "🔄 ═══════════════════════════════════════════════════")
+                    Log.d("FormSyncWorker", "")
                     Result.retry()
                 }
             }
 
         } catch (e: Exception) {
-            Log.e("FormSyncWorker", "❌ Worker exception: ${e.message}", e)
+            Log.e("FormSyncWorker", "❌ WORKER EXCEPTION: ${e.message}")
+            Log.e("FormSyncWorker", "   Type: ${e.javaClass.simpleName}")
+            e.printStackTrace()
             Log.e("FormSyncWorker", "⏳ Scheduling retry with exponential backoff")
+            Log.d("FormSyncWorker", "🔄 ═══════════════════════════════════════════════════")
+            Log.d("FormSyncWorker", "")
             Result.retry()
         }
     }
@@ -183,7 +239,7 @@ class FormSyncWorker @AssistedInject constructor(
         token: String
     ): Boolean {
         return try {
-            Log.d("FormSyncWorker", "   🌐 Calling API: POST /forms/submit")
+            Log.d("FormSyncWorker", "   🌐 Calling repository sync method...")
 
             val result = submissionRepository.syncSubmissionToServer(
                 submission.id,
@@ -191,10 +247,23 @@ class FormSyncWorker @AssistedInject constructor(
                 gpsLocation = null
             )
 
+            result.onSuccess { serverId ->
+                Log.d("FormSyncWorker", "   🌐 API call returned SUCCESS")
+                Log.d("FormSyncWorker", "      Server submission ID: $serverId")
+            }
+
+            result.onFailure { error ->
+                Log.e("FormSyncWorker", "   🌐 API call FAILED: ${error.message}")
+                Log.e("FormSyncWorker", "      Type: ${error.javaClass.simpleName}")
+                error.printStackTrace()
+            }
+
             result.isSuccess
 
         } catch (e: Exception) {
-            Log.e("FormSyncWorker", "   🌐 API call failed: ${e.message}")
+            Log.e("FormSyncWorker", "   🌐 API call exception: ${e.message}")
+            Log.e("FormSyncWorker", "      Type: ${e.javaClass.simpleName}")
+            e.printStackTrace()
             false
         }
     }
@@ -203,12 +272,6 @@ class FormSyncWorker @AssistedInject constructor(
         const val WORK_TAG = "form_sync"
         const val WORK_NAME = "form_sync_work"
 
-        /**
-         * Schedule worker (called by SyncScheduler)
-         *
-         * Note: SyncScheduler.scheduleSync() should be the ONLY entry point
-         * This function is internal, not called elsewhere
-         */
         fun schedule(context: Context) {
             Log.d("FormSyncWorker", "📅 Scheduling FormSyncWorker...")
 
@@ -235,25 +298,7 @@ class FormSyncWorker @AssistedInject constructor(
                 syncRequest
             )
 
-            Log.d("FormSyncWorker", "✅ Worker scheduled")
+            Log.d("FormSyncWorker", "✅ Worker scheduled successfully")
         }
     }
 }
-
-/**
- * 🗑️ REMOVED from old implementation:
- *
- * ❌ canCancel() - Rarely needed
- * ❌ isSyncScheduled() - Use SyncScheduler.isSyncing()
- * ❌ Multiple logging levels - Simplified to be clear
- * ❌ syncSubmissionToServer() is now syncWithToken() internally
- *
- * 🔑 KEY CHANGE:
- * Old: Token fetched per request (with runBlocking in interceptor)
- * New: Token fetched once at worker start, passed to API calls
- *
- * This prevents:
- * - Potential deadlocks from nested runBlocking calls
- * - Network requests without token
- * - Race conditions in token retrieval
- */

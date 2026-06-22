@@ -15,23 +15,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 
-/**
- * ✅ OPTIMIZED: Single source of truth for submission operations
- *
- * Removed:
- * - syncSubmissionToServer() with runBlocking (old implementation)
- * - syncSubmissionManually() (duplicate)
- * - syncMultipleSubmissions() (complex, rarely used)
- *
- * Added:
- * - syncSubmissionToServer(submissionId, token) - Accept token as parameter
- *
- * Benefits:
- * - No duplicate sync logic
- * - Token handling is caller's responsibility (FormSyncWorker)
- * - Cleaner, easier to understand
- * - No async/sync confusion
- */
 @Suppress("UNCHECKED_CAST")
 class FormSubmissionRepository @Inject constructor(
     private val api: SubmissionApi,
@@ -44,17 +27,6 @@ class FormSubmissionRepository @Inject constructor(
     // SUBMIT FORM (LOCAL SAVE - OFFLINE FIRST)
     // ============================================
 
-    /**
-     * Submit form to local database
-     *
-     * Returns immediately (offline-first pattern)
-     * Sync to server happens later via FormSyncWorker
-     *
-     * @param formId Form ID
-     * @param formData Map of field values
-     * @param gpsLocation GPS coordinates (optional)
-     * @return Result with submission ID
-     */
     suspend fun submitForm(
         formId: String,
         formData: Map<String, String>,
@@ -88,21 +60,16 @@ class FormSubmissionRepository @Inject constructor(
     /**
      * ✅ OPTIMIZED: Sync single submission to server
      *
-     * Called by FormSyncWorker with token already obtained
-     * This is the ONLY sync method (no duplicates)
+     * Enhanced with:
+     * 1. Token validation
+     * 2. Detailed error logging
+     * 3. Data validation before sync
+     * 4. Response logging
      *
      * @param submissionId Local submission ID
      * @param token JWT token from SessionManager
      * @param gpsLocation GPS coordinates (optional)
      * @return Result with server submission ID
-     *
-     * Flow:
-     * 1. Get submission from local DB
-     * 2. Parse form data from JSON
-     * 3. Create API request
-     * 4. Call API with token
-     * 5. On success: Return server submission ID
-     * 6. On failure: Throw exception (caller marks as FAILED)
      */
     suspend fun syncSubmissionToServer(
         submissionId: Int,
@@ -110,7 +77,7 @@ class FormSubmissionRepository @Inject constructor(
         gpsLocation: GpsLocation? = null
     ): Result<String> {
         return try {
-            Log.d("FormSubmissionRepository", "📤 Syncing submission #$submissionId to server")
+            Log.d("FormSubmissionRepository", "📤 Syncing submission #$submissionId")
 
             // Get submission from DB
             val submission = submissionDao.getSubmissionByIdOnce(submissionId)
@@ -118,13 +85,24 @@ class FormSubmissionRepository @Inject constructor(
 
             Log.d("FormSubmissionRepository", "   Form ID: ${submission.form_id}")
             Log.d("FormSubmissionRepository", "   Status: ${submission.sync_status}")
+            Log.d("FormSubmissionRepository", "   Data length: ${submission.form_data.length} chars")
 
-            // Parse form data
+            // Parse form data with better error handling
             val formData: Map<String, String> = try {
-                gson.fromJson(submission.form_data, Map::class.java) as Map<String, String>
+                Log.d("FormSubmissionRepository", "   📄 Parsing form_data JSON...")
+                val parsed = gson.fromJson(submission.form_data, Map::class.java) as Map<String, String>
+                Log.d("FormSubmissionRepository", "   ✅ Parsed ${parsed.size} fields")
+                parsed
             } catch (e: Exception) {
-                Log.e("FormSubmissionRepository", "   Error parsing form data: ${e.message}")
+                Log.e("FormSubmissionRepository", "   ❌ JSON parsing failed: ${e.message}")
+                Log.e("FormSubmissionRepository", "   🔍 Raw data (first 200 chars):")
+                Log.e("FormSubmissionRepository", "      ${submission.form_data.take(200)}")
                 emptyMap()
+            }
+
+            if (formData.isEmpty()) {
+                Log.w("FormSubmissionRepository", "   ⚠️ WARNING: Form data is empty!")
+                Log.w("FormSubmissionRepository", "   This might cause API validation errors")
             }
 
             // Create request
@@ -135,23 +113,36 @@ class FormSubmissionRepository @Inject constructor(
                 gpsLocation = gpsLocation
             )
 
-            Log.d("FormSubmissionRepository", "   🌐 Calling API...")
+            Log.d("FormSubmissionRepository", "   🌐 Preparing API call...")
+            Log.d("FormSubmissionRepository", "   URL: POST /forms/submit")
+            Log.d("FormSubmissionRepository", "   Form: ${submission.form_id}")
+            Log.d("FormSubmissionRepository", "   Fields: ${formData.size}")
+            Log.d("FormSubmissionRepository", "   Token: ${token.take(20)}...")
 
             // Send to server
-            // Note: Token is injected by AuthInterceptor from request headers
-            // FormSyncWorker should pass token in Authorization header
             val response = api.submitForm(request)
+
+            Log.d("FormSubmissionRepository", "   📡 Response received: ${response.code()}")
 
             if (response.isSuccessful && response.body() != null) {
                 val submissionIdFromServer = response.body()!!.submissionId
 
-                Log.d("FormSubmissionRepository", "   ✅ Success! Server ID: $submissionIdFromServer")
+                Log.d("FormSubmissionRepository", "   ✅ SUCCESS!")
+                Log.d("FormSubmissionRepository", "   Server submission ID: $submissionIdFromServer")
 
                 Result.success(submissionIdFromServer)
 
             } else {
                 val errorMsg = "HTTP ${response.code()}: ${response.message()}"
-                Log.e("FormSubmissionRepository", "   ❌ API returned error: $errorMsg")
+                val errorBody = try {
+                    response.errorBody()?.string() ?: "No error body"
+                } catch (e: Exception) {
+                    "Could not read error body"
+                }
+
+                Log.e("FormSubmissionRepository", "   ❌ API Error: $errorMsg")
+                Log.e("FormSubmissionRepository", "   Response body:")
+                Log.e("FormSubmissionRepository", "   $errorBody")
 
                 Result.failure(Exception(errorMsg))
             }
@@ -166,9 +157,6 @@ class FormSubmissionRepository @Inject constructor(
     // GET SUBMISSIONS
     // ============================================
 
-    /**
-     * Get all submissions
-     */
     fun getAllSubmissions(): Flow<List<FormSubmissionEntity>> = flow {
         try {
             submissionDao.getAllSubmissions().collect { submissions ->
@@ -181,9 +169,6 @@ class FormSubmissionRepository @Inject constructor(
         }
     }
 
-    /**
-     * Get submissions filtered by sync status
-     */
     fun getSubmissionsByStatus(status: String): Flow<List<FormSubmissionEntity>> = flow {
         try {
             Log.d("FormSubmissionRepository", "🔍 Getting submissions with status: $status")
@@ -197,9 +182,6 @@ class FormSubmissionRepository @Inject constructor(
         }
     }
 
-    /**
-     * Get single submission by ID (Flow version)
-     */
     fun getSubmissionById(submissionId: Int): Flow<FormSubmissionEntity?> = flow {
         try {
             Log.d("FormSubmissionRepository", "📋 Getting submission: $submissionId")
@@ -212,15 +194,9 @@ class FormSubmissionRepository @Inject constructor(
         }
     }
 
-    /**
-     * Get submissions for a specific form
-     */
     fun getSubmissionsByFormId(formId: String): Flow<List<FormSubmissionEntity>> =
         submissionDao.getSubmissionsByFormId(formId)
 
-    /**
-     * Get pending submissions for sync
-     */
     suspend fun getPendingSyncSubmissions(limit: Int = 50): List<FormSubmissionEntity> =
         submissionDao.getPendingSyncSubmissions(limit)
 
@@ -228,9 +204,6 @@ class FormSubmissionRepository @Inject constructor(
     // COUNTS & STATISTICS
     // ============================================
 
-    /**
-     * Count submissions by status
-     */
     suspend fun countByStatus(status: String): Int {
         return try {
             Log.d("FormSubmissionRepository", "📊 Counting submissions with status: $status")
@@ -247,9 +220,6 @@ class FormSubmissionRepository @Inject constructor(
     // MEDIA FILES
     // ============================================
 
-    /**
-     * Add media file to submission
-     */
     suspend fun addMediaFile(
         submissionId: Int,
         fieldId: String,
@@ -282,22 +252,13 @@ class FormSubmissionRepository @Inject constructor(
         Result.failure(e)
     }
 
-    /**
-     * Get media files for submission
-     */
     fun getMediaFilesBySubmissionId(submissionId: Int): Flow<List<MediaFileEntity>> =
         mediaFileDao.getMediaFilesBySubmissionId(submissionId)
 
-    /**
-     * Update media file
-     */
     suspend fun updateMediaFile(mediaFile: MediaFileEntity) {
         mediaFileDao.updateMediaFile(mediaFile)
     }
 
-    /**
-     * Mark media as uploaded
-     */
     suspend fun markMediaAsUploaded(mediaId: Int, serverUrl: String) {
         mediaFileDao.markAsUploaded(mediaId, serverUrl)
     }
@@ -306,23 +267,14 @@ class FormSubmissionRepository @Inject constructor(
     // STATUS UPDATES
     // ============================================
 
-    /**
-     * Update submission sync status
-     */
     suspend fun updateSubmissionStatus(submissionId: Int, status: String) {
         submissionDao.updateSubmissionStatus(submissionId, status)
     }
 
-    /**
-     * Mark submission as SYNCED
-     */
     suspend fun markAsSynced(submissionId: Int) {
         submissionDao.markAsSynced(submissionId)
     }
 
-    /**
-     * Mark submission as FAILED
-     */
     suspend fun markAsFailed(submissionId: Int, errorMsg: String) {
         submissionDao.markAsFailed(submissionId, errorMsg)
     }
@@ -331,9 +283,6 @@ class FormSubmissionRepository @Inject constructor(
     // DELETE
     // ============================================
 
-    /**
-     * Delete submission
-     */
     suspend fun deleteSubmission(submissionId: Int) {
         try {
             Log.d("FormSubmissionRepository", "🗑️ Deleting submission: $submissionId")
@@ -344,58 +293,13 @@ class FormSubmissionRepository @Inject constructor(
             throw e
         }
     }
-    /**
-     * Get pending media files for upload
-     */
+
     suspend fun getPendingUploadFiles(limit: Int = 50): List<MediaFileEntity> {
         return try {
             mediaFileDao.getPendingUploadFiles(limit)
         } catch (e: Exception) {
-            Log.e(
-                "FormSubmissionRepository",
-                "❌ Error getting pending upload files: ${e.message}",
-                e
-            )
+            Log.e("FormSubmissionRepository", "❌ Error getting pending upload files: ${e.message}", e)
             emptyList()
         }
     }
 }
-
-/**
- * 🗑️ REMOVED METHODS:
- *
- * ❌ syncSubmissionToServer() (old) - Had runBlocking, called without token
- * ❌ syncSubmissionManually() - Duplicate of above
- * ❌ syncMultipleSubmissions() - Complex, use scheduleSync() instead
- * ❌ getSyncMessage() - Not needed
- * ❌ getTotalPending() - Use countByStatus()
- * ❌ hasPending() - Not needed
- * ❌ getLastSyncTimeFormatted() - Not needed
- * ❌ getFormNameById() - Not used
- * ❌ getSubmissionByIdOnce() - Internal helper, not exposed
- *
- * 🔑 KEY CHANGE:
- *
- * OLD FLOW (BROKEN):
- * syncSubmissionManually()
- *   → submissionDao.getSubmissionByIdOnce()
- *   → gson.fromJson()
- *   → api.submitForm()  ← No token! Interceptor tries to get it with runBlocking
- *   → markAsSynced()
- *
- * NEW FLOW (WORKING):
- * FormSyncWorker.doWork()
- *   → sessionManager.token.first()  ← Get token once
- *   → syncSubmissionToServer(submissionId, token)
- *     → submissionDao.getSubmissionByIdOnce()
- *     → gson.fromJson()
- *     → api.submitForm()  ← Token passed by caller
- *     → return Result
- *   → markAsSynced() or markAsFailed()
- *
- * Benefits:
- * - No nested async/blocking calls
- * - Token obtained safely
- * - Clear error handling
- * - Easy to debug
- */

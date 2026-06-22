@@ -130,22 +130,3 @@ object SyncScheduler {
     }
 }
 
-/**
- * 🗑️ REMOVED:
- *
- * ❌ syncForms(context) - Use scheduleSync()
- * ❌ uploadMedia(context) - Combined into FormSyncWorker
- * ❌ syncSubmission(context, submissionId) - Use scheduleSync() to sync all pending
- * ❌ syncMultipleSubmissions(context, ids) - Use scheduleSync() to sync all pending
- * ❌ cancelFormSync(context) - Use cancelSync()
- * ❌ cancelMediaUpload(context) - Use cancelSync()
- * ❌ isSubmissionSyncing(context, id) - Use isSyncing()
- * ❌ getSyncStatus(context, id) - Not needed, Room updates automatically
- * ❌ isSubmissionSyncing(context, id) - Use isSyncing()
- *
- * 🔑 WHY REMOVED:
- * - Multiple entry points cause race conditions
- * - Duplicate code (manual vs auto sync)
- * - Complex and hard to maintain
- * - One worker (FormSyncWorker) handles everything
- */

@@ -29,7 +29,7 @@ import javax.inject.Inject
 class FormDetailViewModel @Inject constructor(
     private val formRepository: FormRepository,
     private val submissionRepository: FormSubmissionRepository,
-    @ApplicationContext private val context: Context  // ✅ ADDED: For triggering sync
+    @ApplicationContext private val context: Context  // ✅ Added for SyncScheduler
 ) : ViewModel() {
 
     sealed class UiState {
@@ -62,9 +62,6 @@ class FormDetailViewModel @Inject constructor(
     // LOAD FORM
     // ============================================
 
-    /**
-     * Load form details
-     */
     fun loadForm(formId: String) {
         Log.d("FormDetailViewModel", "📥 Loading form: $formId")
 
@@ -88,24 +85,15 @@ class FormDetailViewModel @Inject constructor(
     // FORM DATA MANAGEMENT
     // ============================================
 
-    /**
-     * Update form field value
-     */
     fun updateFieldValue(fieldId: String, value: String) {
         Log.d("FormDetailViewModel", "✏️ Updated $fieldId = $value")
         formDataMap[fieldId] = value
     }
 
-    /**
-     * Get current form data
-     */
     fun getFormData(): Map<String, String> {
         return formDataMap.toMap()
     }
 
-    /**
-     * Clear form data
-     */
     fun clearFormData() {
         formDataMap.clear()
     }
@@ -114,9 +102,6 @@ class FormDetailViewModel @Inject constructor(
     // VALIDATION
     // ============================================
 
-    /**
-     * Validate form before submission
-     */
     fun validateForm(form: FormDetail): Pair<Boolean, String> {
         Log.d("FormDetailViewModel", "🔍 Validating form")
 
@@ -195,13 +180,25 @@ class FormDetailViewModel @Inject constructor(
                     _submitState.value = SubmitState.Success(submissionId)
 
                     // Clear form after successful submission
-                    // Clear form after successful submission
                     clearFormData()
 
                     Log.d(
                         "FormDetailViewModel",
-                        "✅ Form saved locally and queued for background sync"
+                        "✅ Form saved locally - ID: $submissionId"
                     )
+
+                    // ✅ FIX: TRIGGER BACKGROUND SYNC IMMEDIATELY
+                    Log.d("FormDetailViewModel", "📤 Triggering background sync...")
+                    Log.d("FormDetailViewModel", "   • Worker will start in 1-5 seconds")
+                    Log.d("FormDetailViewModel", "   • Check logcat for FormSyncWorker logs")
+
+                    try {
+                        SyncScheduler.scheduleSync(context)
+                        Log.d("FormDetailViewModel", "✅ Sync scheduled successfully")
+                    } catch (e: Exception) {
+                        Log.e("FormDetailViewModel", "⚠️ Error scheduling sync: ${e.message}", e)
+                        // Still show success to user - sync will retry automatically
+                    }
 
                 }.onFailure { error ->
                     Log.e("FormDetailViewModel", "❌ Submission error: ${error.message}", error)
@@ -219,16 +216,10 @@ class FormDetailViewModel @Inject constructor(
     // STATE RESET
     // ============================================
 
-    /**
-     * Reset submit state after user sees result
-     */
     fun resetSubmitState() {
         _submitState.value = SubmitState.Idle
     }
 
-    /**
-     * Retry submission
-     */
     fun retrySubmit(formId: String, form: FormDetail) {
         resetSubmitState()
         submitForm(formId, form)

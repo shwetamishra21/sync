@@ -128,40 +128,9 @@ class SyncStatusViewModel @Inject constructor(
     // SYNC STATS
     // ============================================
 
-    /**
-     * Get human-readable sync message
-     */
-    fun getSyncMessage(): String = _syncStatus.value.message
-
-    /**
-     * Get total pending items
-     */
-    fun getTotalPending(): Int {
-        val status = _syncStatus.value
-        return status.pendingFormCount + status.pendingMediaCount
-    }
-
-    /**
-     * Check if any items pending
-     */
-    fun hasPending(): Boolean = getTotalPending() > 0
 
     /**
      * Get last sync time formatted
      */
-    fun getLastSyncTimeFormatted(): String {
-        val lastSync = _syncStatus.value.lastSyncTime
-        if (lastSync == 0L) return "Never"
 
-        val now = System.currentTimeMillis()
-        val diffMs = now - lastSync
-        val diffSec = diffMs / 1000
-
-        return when {
-            diffSec < 60 -> "Just now"
-            diffSec < 3600 -> "${diffSec / 60} min ago"
-            diffSec < 86400 -> "${diffSec / 3600} hour ago"
-            else -> "${diffSec / 86400} day ago"
-        }
-    }
 }
