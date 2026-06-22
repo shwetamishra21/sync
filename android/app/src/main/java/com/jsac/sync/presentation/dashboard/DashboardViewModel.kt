@@ -68,7 +68,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // ✅ IMPORTANT: Clear cache before loading
-                repository.clearCache()
+
                 Log.d("DashboardViewModel", "🗑️ Cache cleared")
 
                 _uiState.value = UiState.Loading

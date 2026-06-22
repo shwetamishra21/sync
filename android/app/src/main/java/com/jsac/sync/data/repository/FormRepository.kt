@@ -215,7 +215,7 @@ class FormRepository @Inject constructor(
                     )
                 }
 
-                dao.deleteAllForms()  // Clear old data
+                  // Clear old data
                 dao.insertForms(entities)
                 Log.d("FormRepository", "✅ Forms refreshed: ${entities.size} forms")
 
@@ -230,17 +230,7 @@ class FormRepository @Inject constructor(
         }
     }
 
-    /**
-     * Clear all cached forms
-     */
-    suspend fun clearCache() {
-        try {
-            dao.deleteAllForms()
-            Log.d("FormRepository", "🗑️ Cleared form cache")
-        } catch (e: Exception) {
-            Log.e("FormRepository", "❌ Error clearing cache: ${e.message}", e)
-        }
-    }
+
 
     /**
      * Get sync status for forms

@@ -23,7 +23,7 @@ import androidx.room.PrimaryKey
             entity = FormEntity::class,
             parentColumns = ["id"],
             childColumns = ["form_id"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.NO_ACTION
         )
     ],
     indices = [

@@ -26,7 +26,7 @@ import com.jsac.sync.data.local.db.entity.SyncQueueEntity
  * - media_files: Photos and documents
  * - sync_queue: Sync queue for retrying failed operations
  *
- * Version 3: Added sync_queue table
+ * Version 4: Changed CASCADE to NO_ACTION on form_submissions.form_id
  */
 @Database(
     entities = [
@@ -36,7 +36,7 @@ import com.jsac.sync.data.local.db.entity.SyncQueueEntity
         MediaFileEntity::class,
         SyncQueueEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -64,7 +64,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "jsac_sync_db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration()
                 .build()
         }
@@ -89,7 +89,7 @@ abstract class AppDatabase : RoomDatabase() {
                         `error_message` TEXT,
                         `retry_count` INTEGER NOT NULL DEFAULT 0,
                         `last_sync_attempt` INTEGER,
-                        FOREIGN KEY(`form_id`) REFERENCES `forms`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                        FOREIGN KEY(`form_id`) REFERENCES `forms`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION
                     )
                     """.trimIndent()
                 )
@@ -168,6 +168,64 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_sync_queue_next_retry_time` ON `sync_queue` (`next_retry_time`)"
+                )
+            }
+        }
+
+        /**
+         * Migration from v3 to v4
+         * Changes: form_submissions.form_id foreign key from CASCADE to NO_ACTION
+         * This prevents submissions from being deleted when forms are refreshed
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // SQLite doesn't support altering foreign key constraints directly
+                // So we recreate the form_submissions table with the corrected constraint
+
+                // Step 1: Create new table with corrected foreign key
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `form_submissions_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `form_id` TEXT NOT NULL,
+                        `form_data` TEXT NOT NULL,
+                        `sync_status` TEXT NOT NULL,
+                        `created_at` INTEGER NOT NULL,
+                        `updated_at` INTEGER NOT NULL,
+                        `synced_at` INTEGER,
+                        `error_message` TEXT,
+                        `retry_count` INTEGER NOT NULL DEFAULT 0,
+                        `last_sync_attempt` INTEGER,
+                        FOREIGN KEY(`form_id`) REFERENCES `forms`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION
+                    )
+                    """.trimIndent()
+                )
+
+                // Step 2: Copy all data from old table to new table
+                database.execSQL(
+                    """
+                    INSERT INTO `form_submissions_new` 
+                    SELECT * FROM `form_submissions`
+                    """.trimIndent()
+                )
+
+                // Step 3: Drop old table
+                database.execSQL("DROP TABLE `form_submissions`")
+
+                // Step 4: Rename new table to original name
+                database.execSQL(
+                    "ALTER TABLE `form_submissions_new` RENAME TO `form_submissions`"
+                )
+
+                // Step 5: Recreate indexes
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_form_submissions_form_id` ON `form_submissions` (`form_id`)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_form_submissions_sync_status` ON `form_submissions` (`sync_status`)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_form_submissions_created_at` ON `form_submissions` (`created_at`)"
                 )
             }
         }
