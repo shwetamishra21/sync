@@ -266,21 +266,15 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
     }
 
     private fun syncSubmission(submissionId: Int) {
-        Toast.makeText(
-            requireContext(),
-            "Manual sync is not available",
-            Toast.LENGTH_SHORT
-        ).show()
+        Log.d("SubmissionsListFragment", "🚀 Syncing submission #$submissionId")
+        viewModel.syncOne(requireContext(), submissionId)
+        Toast.makeText(requireContext(), "Sync started for submission #$submissionId", Toast.LENGTH_SHORT).show()
     }
 
     private fun syncAllPending() {
-        Toast.makeText(
-            requireContext(),
-            "Sync functionality is not available",
-            Toast.LENGTH_SHORT
-        ).show()
-
-        viewModel.refreshSubmissions(currentFilter)
+        Log.d("SubmissionsListFragment", "🚀 Syncing all pending submissions")
+        viewModel.syncAllPending(requireContext())
+        Toast.makeText(requireContext(), "Sync started for all pending submissions", Toast.LENGTH_SHORT).show()
     }
 
     private fun deleteSubmission(submissionId: Int) {

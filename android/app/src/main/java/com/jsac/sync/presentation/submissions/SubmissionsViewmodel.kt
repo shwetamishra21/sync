@@ -49,7 +49,7 @@ class SubmissionsViewModel @Inject constructor(
      * @param status Filter by sync status (PENDING, SYNCING, SYNCED, FAILED) or null for all
      */
     fun loadSubmissions(status: String? = null) {
-        Log.d("SubmissionsViewModel", "📥 Loading submissions (filter: $status)")
+        Log.d("SubmissionsViewModel", "📥 LOADSUBMISSIONS CALLED - status filter: $status")
 
         currentFilter = status
 
@@ -57,25 +57,34 @@ class SubmissionsViewModel @Inject constructor(
             _submissions.value = UiState.Loading
 
             try {
-                val submissions = if (status == null) {
-                    // Get all submissions
+                val flowToCollect = if (status == null) {
+                    Log.d("SubmissionsViewModel", "   Getting ALL submissions...")
                     repository.getAllSubmissions()
                 } else {
-                    // Get submissions by status
+                    Log.d("SubmissionsViewModel", "   Getting submissions with status: $status")
                     repository.getSubmissionsByStatus(status)
                 }
 
-                // Collect and emit
-                submissions.collect { submissionList ->
-                    Log.d("SubmissionsViewModel", "✅ Loaded ${submissionList.size} submissions")
+                flowToCollect.collect { submissionList ->
+                    Log.d("SubmissionsViewModel", "📊 FLOW EMITTED: ${submissionList.size} submissions")
+                    submissionList.forEachIndexed { idx, sub ->
+                        Log.d("SubmissionsViewModel", "   [$idx] ID=${sub.id}, form=${sub.form_id}, status=${sub.sync_status}")
+                    }
+
                     _submissions.value = UiState.Success(submissionList)
                 }
 
             } catch (e: Exception) {
                 Log.e("SubmissionsViewModel", "❌ Error loading submissions: ${e.message}", e)
+                e.printStackTrace()
                 _submissions.value = UiState.Error(e.message ?: "Unknown error")
             }
         }
+    }
+
+    init {
+        Log.d("SubmissionsViewModel", "🎬 SubmissionsViewModel INIT")
+        loadSubmissions(null)
     }
 
     /**
@@ -117,5 +126,16 @@ class SubmissionsViewModel @Inject constructor(
             Log.e("SubmissionsViewModel", "Error getting count: ${e.message}")
             0
         }
+    }
+    fun syncOne(context: android.content.Context, submissionId: Int) {
+        Log.d("SubmissionsViewModel", "🚀 Sync requested for #$submissionId")
+        com.jsac.sync.worker.SyncScheduler.scheduleSyncSingle(context, submissionId)
+        // Room Flow already feeds this screen, so the row updates automatically
+        // once FormSyncWorker writes the new status.
+    }
+
+    fun syncAllPending(context: android.content.Context) {
+        Log.d("SubmissionsViewModel", "🚀 Sync-all requested")
+        com.jsac.sync.worker.SyncScheduler.scheduleSync(context)
     }
 }

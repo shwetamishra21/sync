@@ -157,28 +157,15 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private fun updateSyncUI(status: SyncStatusViewModel.SyncStatus) {
         Log.d("HomeFragment", "📊 Updating sync UI")
 
-        // Show pending count
-        if (status.pendingFormCount > 0 || status.pendingMediaCount > 0) {
+        if (status.pendingFormCount > 0) {
             tvPendingCount.visibility = View.VISIBLE
-
-            tvPendingCount.text = buildString {
-                if (status.pendingFormCount > 0) {
-                    append("📋 ${status.pendingFormCount} pending form(s)")
-                }
-
-                if (status.pendingMediaCount > 0) {
-                    if (status.pendingFormCount > 0) append("\n")
-                    append("📸 ${status.pendingMediaCount} pending media file(s)")
-                }
-            }
+            tvPendingCount.text = "📋 ${status.pendingFormCount} pending form(s)"
         } else {
             tvPendingCount.visibility = View.GONE
         }
 
-        // Show sync status
         tvSyncStatus.text = status.message
 
-        // Show/hide progress bar
         if (status.isSyncing) {
             progressBarSync.visibility = View.VISIBLE
             btnManualSync.isEnabled = false

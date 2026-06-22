@@ -151,24 +151,24 @@ class FormDetailViewModel @Inject constructor(
      * 6. Background sync happens automatically
      */
     fun submitForm(formId: String, form: FormDetail) {
-        Log.d("FormDetailViewModel", "📤 Submitting form: $formId")
+        Log.d("FormDetailViewModel", "🚀 SUBMIT CALLED - formId: $formId, fields: ${form.fields.size}")
 
         viewModelScope.launch {
             _submitState.value = SubmitState.Submitting
 
             try {
-                // Validate form
                 val (isValid, errorMsg) = validateForm(form)
                 if (!isValid) {
-                    Log.d("FormDetailViewModel", "❌ Validation error: $errorMsg")
+                    Log.d("FormDetailViewModel", "❌ Validation FAILED: $errorMsg")
                     _submitState.value = SubmitState.Error(errorMsg)
                     return@launch
                 }
 
-                // Get current form data
                 val formData = getFormData()
+                Log.d("FormDetailViewModel", "✅ Form data collected: ${formData.size} fields")
+                formData.forEach { (k, v) -> Log.d("FormDetailViewModel", "   $k = $v") }
 
-                // Submit (saves to local DB)
+                Log.d("FormDetailViewModel", "📝 Calling submissionRepository.submitForm()...")
                 val result = submissionRepository.submitForm(
                     formId = formId,
                     formData = formData,
@@ -176,32 +176,21 @@ class FormDetailViewModel @Inject constructor(
                 )
 
                 result.onSuccess { submissionId ->
-                    Log.d("FormDetailViewModel", "✅ Form submitted locally - ID: $submissionId")
+                    Log.d("FormDetailViewModel", "✅✅✅ SUBMISSION SAVED TO ROOM - ID: $submissionId")
                     _submitState.value = SubmitState.Success(submissionId)
-
-                    // Clear form after successful submission
                     clearFormData()
 
-                    Log.d(
-                        "FormDetailViewModel",
-                        "✅ Form saved locally - ID: $submissionId"
-                    )
-
-                    // ✅ FIX: TRIGGER BACKGROUND SYNC IMMEDIATELY
-                    Log.d("FormDetailViewModel", "📤 Triggering background sync...")
-                    Log.d("FormDetailViewModel", "   • Worker will start in 1-5 seconds")
-                    Log.d("FormDetailViewModel", "   • Check logcat for FormSyncWorker logs")
-
                     try {
+                        Log.d("FormDetailViewModel", "📤 Scheduling sync...")
                         SyncScheduler.scheduleSync(context)
-                        Log.d("FormDetailViewModel", "✅ Sync scheduled successfully")
+                        Log.d("FormDetailViewModel", "✅ Sync scheduled")
                     } catch (e: Exception) {
                         Log.e("FormDetailViewModel", "⚠️ Error scheduling sync: ${e.message}", e)
-                        // Still show success to user - sync will retry automatically
                     }
 
                 }.onFailure { error ->
-                    Log.e("FormDetailViewModel", "❌ Submission error: ${error.message}", error)
+                    Log.e("FormDetailViewModel", "❌❌❌ SUBMISSION SAVE FAILED: ${error.message}", error)
+                    error.printStackTrace()
                     _submitState.value = SubmitState.Error(error.message ?: "Unknown error")
                 }
 

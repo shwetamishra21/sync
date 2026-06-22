@@ -32,7 +32,9 @@ class FormSubmissionRepository @Inject constructor(
         formData: Map<String, String>,
         gpsLocation: GpsLocation? = null
     ): Result<Int> = try {
-        Log.d("FormSubmissionRepository", "📝 Submitting form: $formId")
+        Log.d("FormSubmissionRepository", "📝 SUBMITFORM CALLED")
+        Log.d("FormSubmissionRepository", "   formId: $formId")
+        Log.d("FormSubmissionRepository", "   formData keys: ${formData.keys}")
 
         val submission = FormSubmissionEntity(
             form_id = formId,
@@ -42,14 +44,22 @@ class FormSubmissionRepository @Inject constructor(
             updated_at = System.currentTimeMillis()
         )
 
+        Log.d("FormSubmissionRepository", "   📌 Created entity:")
+        Log.d("FormSubmissionRepository", "      form_id: ${submission.form_id}")
+        Log.d("FormSubmissionRepository", "      sync_status: ${submission.sync_status}")
+        Log.d("FormSubmissionRepository", "      form_data length: ${submission.form_data.length}")
+        Log.d("FormSubmissionRepository", "      created_at: ${submission.created_at}")
+
+        Log.d("FormSubmissionRepository", "   💾 Inserting into Room...")
         val submissionId = submissionDao.insertSubmission(submission).toInt()
 
-        Log.d("FormSubmissionRepository", "✅ Form saved locally - ID: $submissionId")
+        Log.d("FormSubmissionRepository", "✅✅✅ SAVED TO ROOM - ID: $submissionId")
 
         Result.success(submissionId)
 
     } catch (e: Exception) {
-        Log.e("FormSubmissionRepository", "❌ Error submitting form: ${e.message}", e)
+        Log.e("FormSubmissionRepository", "❌❌❌ ERROR: ${e.message}", e)
+        e.printStackTrace()
         Result.failure(e)
     }
 
@@ -300,6 +310,18 @@ class FormSubmissionRepository @Inject constructor(
         } catch (e: Exception) {
             Log.e("FormSubmissionRepository", "❌ Error getting pending upload files: ${e.message}", e)
             emptyList()
+        }
+    }
+    /**
+     * Get a single submission by ID (without Flow)
+     * Used by FormSyncWorker to fetch a specific submission for targeted sync
+     */
+    suspend fun getSubmissionByIdOnce(submissionId: Int): FormSubmissionEntity? {
+        return try {
+            submissionDao.getSubmissionByIdOnce(submissionId)
+        } catch (e: Exception) {
+            Log.e("FormSubmissionRepository", "❌ Error fetching submission #$submissionId: ${e.message}", e)
+            null
         }
     }
 }

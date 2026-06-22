@@ -112,8 +112,11 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
         // ============================================
 
         btnSync.setOnClickListener {
-            Log.d("SubmissionDetailFragment", "⚡ Sync button clicked")
-
+            Log.d("SubmissionDetailFragment", "⚡ Sync button clicked for #$submissionId")
+            com.jsac.sync.worker.SyncScheduler.scheduleSyncSingle(requireContext(), submissionId)
+            Toast.makeText(requireContext(), "Sync started…", Toast.LENGTH_SHORT).show()
+            // No need to manually refresh — loadSubmission() already collects a Room
+            // Flow, so the status badge updates on its own once the worker finishes.
         }
 
         btnDelete.setOnClickListener {
