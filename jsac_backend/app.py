@@ -1,6 +1,11 @@
 import os
+<<<<<<< HEAD
 from models.submission_model import FormSubmission
 from flask import Flask, request, jsonify
+=======
+import time
+from flask import Flask, request
+>>>>>>> 1f8d224 (unstable state)
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 import jwt
@@ -49,7 +54,17 @@ app.config["SECRET_KEY"] = "jsac_secret_key"
 reset_tokens = {}
 
 # ============================================
+<<<<<<< HEAD
 # MIDDLEWARE - JWT AUTHENTICATION
+=======
+# FORM SUBMISSION STORAGE (IN-MEMORY FOR NOW)
+# ============================================
+
+submissions_storage = {}  # form_id → [submissions]
+
+# ============================================
+# FORM TEMPLATES DATABASE
+>>>>>>> 1f8d224 (unstable state)
 # ============================================
 
 def token_required(f):
@@ -1072,6 +1087,147 @@ def delete_submission(submission_id):
             "status": "error",
             "message": str(e)
         }, 500
+
+# ============================================
+# FORM SUBMISSION ENDPOINTS (NEW)
+# ============================================
+
+@app.route("/forms/submit", methods=["POST"])
+def submit_form():
+    """
+    Accept a completed form submission from mobile app
+    
+    Request body:
+    {
+        "form_id": "form_001",
+        "form_data": {
+            "field_001": "John Doe",
+            "field_002": "john@example.com",
+            "field_003": "Birth Certificate"
+        },
+        "submitted_at": 1234567890,
+        "gps_location": {
+            "lat": 25.5941,
+            "lng": 85.1376
+        }
+    }
+    """
+    print("\n[SUBMISSION] POST /forms/submit called")
+    
+    try:
+        data = request.get_json()
+
+        form_id = data.get("form_id")
+        form_data = data.get("form_data")
+        submitted_at = data.get("submitted_at")
+        gps_location = data.get("gps_location")
+
+        # Validate required fields
+        if not form_id or not form_data:
+            print("[SUBMISSION] Missing form_id or form_data")
+            return {
+                "status": "error",
+                "message": "form_id and form_data are required"
+            }, 400
+
+        # Generate submission ID
+        submission_id = f"sub_{form_id}_{int(time.time() * 1000)}"
+
+        # Store in memory
+        if form_id not in submissions_storage:
+            submissions_storage[form_id] = []
+        
+        submission = {
+            "id": submission_id,
+            "form_data": form_data,
+            "submitted_at": submitted_at,
+            "gps_location": gps_location
+        }
+        
+        submissions_storage[form_id].append(submission)
+
+        # Log submission
+        print(f"\n{'='*60}")
+        print(f"✅ FORM SUBMISSION RECEIVED")
+        print(f"{'='*60}")
+        print(f"Submission ID: {submission_id}")
+        print(f"Form ID: {form_id}")
+        print(f"Submitted at: {submitted_at}")
+        print(f"Data: {form_data}")
+        if gps_location:
+            print(f"GPS: {gps_location}")
+        print(f"{'='*60}\n")
+
+        # TODO: In production, save to database
+        # TODO: Validate form_data against form schema
+        # TODO: Save GPS location if provided
+
+        return {
+            "status": "success",
+            "submission_id": submission_id,
+            "message": "Form submitted successfully",
+            "submitted_at": submitted_at
+        }, 201
+
+    except Exception as e:
+        print(f"[SUBMISSION] Error in submit_form: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
+
+
+@app.route("/submissions/<submission_id>", methods=["GET"])
+def get_submission(submission_id):
+    """
+    Get details of a previously submitted form
+    """
+    print(f"\n[SUBMISSION] GET /submissions/{submission_id}")
+    
+    try:
+        # Search for submission across all forms
+        for form_id, submissions in submissions_storage.items():
+            for submission in submissions:
+                if submission["id"] == submission_id:
+                    return {
+                        "status": "success",
+                        "submission": submission
+                    }, 200
+        
+        # Not found
+        return {
+            "status": "error",
+            "message": f"Submission {submission_id} not found"
+        }, 404
+
+    except Exception as e:
+        print(f"[SUBMISSION] Error: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
+
+
+@app.route("/forms/<form_id>/submissions", methods=["GET"])
+def get_form_submissions(form_id):
+    """
+    Get all submissions for a specific form
+    """
+    print(f"\n[SUBMISSION] GET /forms/{form_id}/submissions")
+    
+    try:
+        if form_id not in submissions_storage:
+            return {
+                "status": "success",
+                "submissions": []
+            }, 200
+        
+        submissions = submissions_storage[form_id]
+        
+        return {
+            "status": "success",
+            "submissions": submissions,
+            "count": len(submissions)
+        }, 200
+
+    except Exception as e:
+        print(f"[SUBMISSION] Error: {str(e)}")
+        return {"message": f"Error: {str(e)}"}, 500
+
 
 if __name__ == "__main__":
     print("\n" + "="*50)
