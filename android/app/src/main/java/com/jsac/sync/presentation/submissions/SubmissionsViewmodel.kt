@@ -12,15 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * ✅ FIXED: SubmissionsViewModel
- *
- * Changes:
- * 1. Removed duplicate init {} block (was causing issues)
- * 2. Added explicit limit to get last 15 submissions
- * 3. Improved logging for debugging
- * 4. Ensured loadSubmissions() is called only once on initialization
- */
 @HiltViewModel
 class SubmissionsViewModel @Inject constructor(
     private val repository: FormSubmissionRepository
@@ -35,32 +26,23 @@ class SubmissionsViewModel @Inject constructor(
     private val _submissions = MutableStateFlow<UiState>(UiState.Loading)
     val submissions: StateFlow<UiState> = _submissions.asStateFlow()
 
-    // Current filter
     private var currentFilter: String? = null
 
-    // ✅ FIXED: Single init block - removed duplicate
     init {
         Log.d("SubmissionsViewModel", "🎬 SubmissionsViewModel INIT")
-        loadSubmissions(null)  // Load all submissions (no filter) by default
+        loadSubmissions(null)
     }
 
-    /**
-     * Load submissions from repository
-     *
-     * @param status Filter by sync status (PENDING, SYNCING, SYNCED, FAILED) or null for all
-     */
     fun loadSubmissions(status: String? = null) {
         Log.d("SubmissionsViewModel", "📥 LOADSUBMISSIONS CALLED - status filter: $status")
 
         currentFilter = status
-
         viewModelScope.launch {
             _submissions.value = UiState.Loading
 
             try {
                 val flowToCollect = if (status == null) {
-                    Log.d("SubmissionsViewModel", "   Getting ALL submissions (last 15)...")
-                    // ✅ Get all submissions without limit - let the UI handle pagination
+                    Log.d("SubmissionsViewModel", "   Getting ALL submissions...")
                     repository.getAllSubmissions()
                 } else {
                     Log.d("SubmissionsViewModel", "   Getting submissions with status: $status")
@@ -70,8 +52,6 @@ class SubmissionsViewModel @Inject constructor(
                 flowToCollect.collect { submissionList ->
                     Log.d("SubmissionsViewModel", "📊 FLOW EMITTED: ${submissionList.size} submissions")
 
-                    // ✅ FIXED: Show ALL submissions, not just first one
-                    // Limit to last 15 on display side for efficiency
                     val displayList = if (submissionList.size > 15) {
                         Log.d("SubmissionsViewModel", "   Showing last 15 of ${submissionList.size} submissions")
                         submissionList.takeLast(15)
@@ -95,17 +75,11 @@ class SubmissionsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Refresh submissions (clear and reload)
-     */
     fun refreshSubmissions(status: String? = null) {
         Log.d("SubmissionsViewModel", "🔄 Refreshing submissions")
         loadSubmissions(status)
     }
 
-    /**
-     * Delete a submission
-     */
     fun deleteSubmission(submissionId: Int) {
         Log.d("SubmissionsViewModel", "🗑️ Deleting submission: $submissionId")
 
@@ -113,8 +87,6 @@ class SubmissionsViewModel @Inject constructor(
             try {
                 repository.deleteSubmission(submissionId)
                 Log.d("SubmissionsViewModel", "✅ Submission deleted")
-
-                // Refresh list
                 loadSubmissions(currentFilter)
 
             } catch (e: Exception) {
@@ -124,9 +96,6 @@ class SubmissionsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Get submission count for a status
-     */
     suspend fun getSubmissionCount(status: String): Int {
         return try {
             repository.countByStatus(status)
@@ -136,19 +105,11 @@ class SubmissionsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Sync a single submission
-     */
     fun syncOne(context: android.content.Context, submissionId: Int) {
         Log.d("SubmissionsViewModel", "🚀 Sync requested for #$submissionId")
         com.jsac.sync.worker.SyncScheduler.scheduleSyncSingle(context, submissionId)
-        // Room Flow already feeds this screen, so the row updates automatically
-        // once FormSyncWorker writes the new status.
     }
 
-    /**
-     * Sync all pending submissions
-     */
     fun syncAllPending(context: android.content.Context) {
         Log.d("SubmissionsViewModel", "🚀 Sync-all requested")
         com.jsac.sync.worker.SyncScheduler.scheduleSync(context)

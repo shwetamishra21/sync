@@ -22,21 +22,11 @@ import com.jsac.sync.R
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
-/**
- * ✅ FIXED: SubmissionsListFragment
- *
- * Changes:
- * 1. Initialize filter spinner to "All" (shows all submissions)
- * 2. Ensure RecyclerView visibility is properly managed
- * 3. Added logging to track data flow
- * 4. Fixed pull-to-refresh animation handling
- */
 @AndroidEntryPoint
 class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
 
     private val viewModel: SubmissionsViewModel by viewModels()
 
-    // UI Components
     private lateinit var rvSubmissions: RecyclerView
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var progressBar: ProgressBar
@@ -46,11 +36,7 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
     private lateinit var btnSyncAll: Button
 
     private lateinit var adapter: SubmissionsAdapter
-
-    // Current filter status
     private var currentFilter: String? = null
-
-    // ✅ NEW: Track if we're initializing spinner to prevent recursive calls
     private var isInitializingSpinner = false
 
     override fun onViewCreated(
@@ -61,10 +47,6 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
 
         Log.d("SubmissionsListFragment", "🎬 Fragment created")
 
-        // ============================================
-        // BIND VIEWS
-        // ============================================
-
         rvSubmissions = view.findViewById(R.id.rvSubmissions)
         swipeRefresh = view.findViewById(R.id.swipeRefresh)
         progressBar = view.findViewById(R.id.progressBar)
@@ -73,39 +55,18 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
         spinnerFilter = view.findViewById(R.id.spinnerFilter)
         btnSyncAll = view.findViewById(R.id.btnSyncAll)
 
-        // ============================================
-        // SETUP RECYCLER VIEW
-        // ============================================
-
         setupRecyclerView()
-
-        // ============================================
-        // SETUP FILTER SPINNER
-        // ============================================
-
         setupFilterSpinner()
-
-        // ============================================
-        // SETUP PULL-TO-REFRESH
-        // ============================================
 
         swipeRefresh.setOnRefreshListener {
             Log.d("SubmissionsListFragment", "🔄 Pull-to-refresh triggered")
             viewModel.refreshSubmissions(currentFilter)
         }
 
-        // ============================================
-        // SETUP SYNC ALL BUTTON
-        // ============================================
-
         btnSyncAll.setOnClickListener {
             Log.d("SubmissionsListFragment", "🚀 Sync all pending clicked")
             syncAllPending()
         }
-
-        // ============================================
-        // OBSERVE UI STATE
-        // ============================================
 
         observeSubmissions()
     }
@@ -126,11 +87,7 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
                     )
                 } catch (e: Exception) {
                     Log.e("SubmissionsListFragment", "Navigation error: ${e.message}")
-                    Toast.makeText(
-                        requireContext(),
-                        "Navigation error",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(requireContext(), "Navigation error", Toast.LENGTH_SHORT).show()
                 }
             },
             onSyncClick = { submissionId ->
@@ -177,7 +134,6 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
                 position: Int,
                 id: Long
             ) {
-                // ✅ FIXED: Skip if we're initializing (prevents loading data twice)
                 if (isInitializingSpinner) {
                     Log.d("SubmissionsListFragment", "⏭️ Skipping filter change during init")
                     return
@@ -202,11 +158,10 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
             override fun onNothingSelected(parent: AdapterView<*>) {}
         }
 
-        // ✅ FIXED: Set default filter to "All" (index 0)
         isInitializingSpinner = true
-        spinnerFilter.setSelection(0)  // "All" option
+        spinnerFilter.setSelection(0)
         isInitializingSpinner = false
-        currentFilter = null  // Load all submissions
+        currentFilter = null
 
         Log.d("SubmissionsListFragment", "✅ Filter spinner set to 'All' by default")
     }
@@ -241,7 +196,6 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
                     }
                 }
 
-                // ✅ FIXED: Update refresh animation
                 swipeRefresh.isRefreshing = (state is SubmissionsViewModel.UiState.Loading)
             }
         }
@@ -265,7 +219,6 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
         rvSubmissions.visibility = View.VISIBLE
         containerEmpty.visibility = View.GONE
 
-        // ✅ FIXED: Submit list to adapter
         adapter.submitList(submissions)
 
         Log.d("SubmissionsListFragment", "   ✅ RecyclerView updated with submissions")
@@ -306,21 +259,12 @@ class SubmissionsListFragment : Fragment(R.layout.fragment_submissions_list) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 viewModel.deleteSubmission(submissionId)
-                Toast.makeText(
-                    requireContext(),
-                    "Submission deleted",
-                    Toast.LENGTH_SHORT
-                ).show()
-
+                Toast.makeText(requireContext(), "Submission deleted", Toast.LENGTH_SHORT).show()
                 viewModel.refreshSubmissions(currentFilter)
 
             } catch (e: Exception) {
                 Log.e("SubmissionsListFragment", "❌ Delete error: ${e.message}", e)
-                Toast.makeText(
-                    requireContext(),
-                    "Delete failed: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(requireContext(), "Delete failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }

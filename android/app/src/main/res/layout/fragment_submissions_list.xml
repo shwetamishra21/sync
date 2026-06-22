@@ -77,7 +77,7 @@
 
     <!-- ============================================ -->
     <!-- SWIPE REFRESH LAYOUT -->
-    <!-- ✅ FIXED: Ensure RecyclerView is inside SwipeRefresh -->
+    <!-- ✅ FIXED: SwipeRefreshLayout takes remaining space -->
     <!-- ============================================ -->
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -87,19 +87,22 @@
         android:layout_weight="1"
         android:visibility="visible">
 
-        <!-- Submissions List RecyclerView -->
-        <!-- ✅ FIXED: Initial visibility is GONE, shown only when data loads -->
+        <!-- ============================================ -->
+        <!-- RECYCLER VIEW - KEY FIX HERE -->
+        <!-- ✅ FIXED: height="match_parent" allows RecyclerView -->
+        <!-- to expand and show all items properly -->
+        <!-- ============================================ -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvSubmissions"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="gone"/>
+            android:visibility="gone"
+            android:scrollbars="vertical"/>
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     <!-- ============================================ -->
     <!-- EMPTY STATE -->
-    <!-- ✅ FIXED: Visible when no submissions available -->
     <!-- ============================================ -->
 
     <LinearLayout
