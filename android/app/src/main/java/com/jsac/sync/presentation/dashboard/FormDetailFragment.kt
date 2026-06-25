@@ -3,12 +3,18 @@ package com.jsac.sync.presentation.dashboard
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.core.content.FileProvider
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.TextView
+import android.net.Uri
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -19,6 +25,12 @@ import com.jsac.sync.data.remote.dto.FormDetail
 import com.jsac.sync.data.remote.dto.FormField
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
+import com.jsac.sync.utils.LocationHelper
 
 /**
  * Fragment for displaying and filling a form
@@ -37,6 +49,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
 
     private lateinit var formId: String
     private lateinit var formName: String
+    private val mediaUploadViewModel: MediaUploadViewModel by viewModels()
 
     // UI Components
     private lateinit var tvFormTitle: TextView
@@ -45,8 +58,114 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
     private lateinit var btnSubmit: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var tvError: TextView
-
     private var currentForm: FormDetail? = null
+
+    private var pendingGpsFieldId: String? = null
+    private var pendingMediaFieldId: String? = null
+    private var pendingCameraFieldId: String? = null
+    private var capturedPhotoUri: Uri? = null
+
+    private val locationPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+
+            if (granted) {
+                pendingGpsFieldId?.let {
+                    captureLocation(it)
+                }
+            } else {
+                Toast.makeText(
+                    requireContext(),
+                    "Location permission denied",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    private val mediaPickerLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.GetContent()
+        ) { uri ->
+
+            if (uri != null) {
+
+                pendingMediaFieldId?.let { fieldId ->
+
+                    viewModel.updateFieldValue(
+                        fieldId,
+                        uri.toString()
+                    )
+
+                    Toast.makeText(
+                        requireContext(),
+                        "Photo selected",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    private val cameraPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+
+            if (granted) {
+
+                pendingCameraFieldId?.let { fieldId ->
+
+                    val imageFile = createImageFile()
+
+                    capturedPhotoUri =
+                        FileProvider.getUriForFile(
+                            requireContext(),
+                            "${requireContext().packageName}.provider",
+                            imageFile
+                        )
+
+                    cameraLauncher.launch(capturedPhotoUri)
+                }
+
+            } else {
+
+                Toast.makeText(
+                    requireContext(),
+                    "Camera permission denied",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+    private val cameraLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.TakePicture()
+        ) { success ->
+
+            if (success && capturedPhotoUri != null) {
+
+                pendingCameraFieldId?.let { fieldId ->
+
+                    val imagePath =
+                        capturedPhotoUri?.path ?: ""
+
+                    viewModel.updateFieldValue(
+                        fieldId,
+                        imagePath
+                    )
+
+                    Log.d(
+                        "FormDetailFragment",
+                        "📸 Image path = $imagePath"
+                    )
+
+                    Toast.makeText(
+                        requireContext(),
+                        "Photo captured",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+
 
     override fun onViewCreated(
         view: View,
@@ -299,9 +418,187 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
 
                 fieldContainer.addView(editText)
             }
+            "media" -> {
+
+                val button = Button(requireContext()).apply {
+                    text = "Select Photo"
+
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                }
+
+                button.setOnClickListener {
+
+                    pendingMediaFieldId = field.id
+
+                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                        .setTitle("Select Image")
+                        .setItems(
+                            arrayOf(
+                                "Camera",
+                                "Gallery"
+                            )
+                        ) { _, which ->
+
+                            when (which) {
+
+                                0 -> {
+
+                                    pendingCameraFieldId = field.id
+
+                                    if (
+                                        ContextCompat.checkSelfPermission(
+                                            requireContext(),
+                                            Manifest.permission.CAMERA
+                                        ) == PackageManager.PERMISSION_GRANTED
+                                    ) {
+
+                                        val imageFile = createImageFile()
+
+                                        capturedPhotoUri =
+                                            FileProvider.getUriForFile(
+                                                requireContext(),
+                                                "${requireContext().packageName}.provider",
+                                                imageFile
+                                            )
+
+                                        cameraLauncher.launch(capturedPhotoUri)
+
+                                    } else {
+
+                                        cameraPermissionLauncher.launch(
+                                            Manifest.permission.CAMERA
+                                        )
+                                    }
+                                }
+
+                                1 -> {
+                                    mediaPickerLauncher.launch("image/*")
+                                }
+                            }
+                        }
+                        .show()
+                }
+
+                fieldContainer.addView(button)
+            }
+
+            "gps" -> {
+
+                val button = Button(requireContext()).apply {
+                    text = "Capture Location"
+
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                }
+
+                button.setOnClickListener {
+
+                    if (
+                        ContextCompat.checkSelfPermission(
+                            requireContext(),
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+
+                        captureLocation(field.id)
+
+                    } else {
+
+                        pendingGpsFieldId = field.id
+
+                        locationPermissionLauncher.launch(
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        )
+                    }
+                }
+
+                fieldContainer.addView(button)
+            }
         }
 
         containerForm.addView(fieldContainer)
+    }
+    private fun createImageFile(): File {
+
+        val timeStamp = SimpleDateFormat(
+            "yyyyMMdd_HHmmss",
+            Locale.getDefault()
+        ).format(Date())
+
+        val imageDir = File(
+            requireContext().cacheDir,
+            "images"
+        )
+
+        if (!imageDir.exists()) {
+            imageDir.mkdirs()
+        }
+
+        return File(
+            imageDir,
+            "IMG_${timeStamp}.jpg"
+        )
+    }
+
+    private fun captureLocation(fieldId: String) {
+
+        viewLifecycleOwner.lifecycleScope.launch {
+
+            try {
+
+                val fusedClient =
+                    LocationServices.getFusedLocationProviderClient(
+                        requireContext()
+                    )
+
+                val locationHelper =
+                    LocationHelper(
+                        requireContext(),
+                        fusedClient
+                    )
+
+                val location =
+                    locationHelper.getCurrentLocation()
+
+                if (location != null) {
+
+                    val value =
+                        "${location.latitude},${location.longitude}"
+
+                    viewModel.updateFieldValue(
+                        fieldId,
+                        value
+                    )
+
+                    Toast.makeText(
+                        requireContext(),
+                        "Location captured",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                } else {
+
+                    Toast.makeText(
+                        requireContext(),
+                        "Unable to get location",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+            } catch (e: Exception) {
+
+                Toast.makeText(
+                    requireContext(),
+                    e.message,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 
     private fun showLoading() {

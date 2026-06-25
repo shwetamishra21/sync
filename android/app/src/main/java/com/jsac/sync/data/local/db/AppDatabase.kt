@@ -23,9 +23,8 @@ import com.jsac.sync.data.local.db.entity.MediaFileEntity
  * - form_fields: Form field definitions
  * - form_submissions: User-submitted form data
  * - media_files: Photos and documents
- * - sync_queue: Sync queue for retrying failed operations
  *
- * Version 4: Changed CASCADE to NO_ACTION on form_submissions.form_id
+ * Version 4: Removed unused sync_queue table (dead code cleanup)
  */
 @Database(
     entities = [
@@ -34,7 +33,7 @@ import com.jsac.sync.data.local.db.entity.MediaFileEntity
         FormSubmissionEntity::class,
         MediaFileEntity::class
     ],
-    version = 4,  // ← INCREMENT VERSION
+    version = 5,  // ← INCREMENT VERSION
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -62,7 +61,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "jsac_sync_db"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .fallbackToDestructiveMigration()
                 .build()
         }
@@ -172,58 +171,38 @@ abstract class AppDatabase : RoomDatabase() {
 
         /**
          * Migration from v3 to v4
-         * Changes: form_submissions.form_id foreign key from CASCADE to NO_ACTION
-         * This prevents submissions from being deleted when forms are refreshed
+         * Removes: sync_queue table (dead code cleanup)
+         * Reason: sync_queue was never integrated into the actual sync flow.
+         * FormSubmissionRepository handles all sync logic directly without using sync_queue.
+         * Keeping unused code creates maintenance burden and confusion.
          */
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // SQLite doesn't support altering foreign key constraints directly
-                // So we recreate the form_submissions table with the corrected constraint
+                // Drop unused sync_queue table and related indexes
+                try {
+                    database.execSQL("DROP TABLE IF EXISTS `sync_queue`")
+                    android.util.Log.d("AppDatabase", "✅ Dropped unused sync_queue table")
+                } catch (e: Exception) {
+                    android.util.Log.e("AppDatabase", "❌ Error dropping sync_queue: ${e.message}")
+                }
+            }
+        }
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
 
-                // Step 1: Create new table with corrected foreign key
                 database.execSQL(
                     """
-                    CREATE TABLE IF NOT EXISTS `form_submissions_new` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        `form_id` TEXT NOT NULL,
-                        `form_data` TEXT NOT NULL,
-                        `sync_status` TEXT NOT NULL,
-                        `created_at` INTEGER NOT NULL,
-                        `updated_at` INTEGER NOT NULL,
-                        `synced_at` INTEGER,
-                        `error_message` TEXT,
-                        `retry_count` INTEGER NOT NULL DEFAULT 0,
-                        `last_sync_attempt` INTEGER,
-                        FOREIGN KEY(`form_id`) REFERENCES `forms`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION
-                    )
-                    """.trimIndent()
+            ALTER TABLE form_submissions
+            ADD COLUMN idempotency_key TEXT NOT NULL DEFAULT ''
+            """.trimIndent()
                 )
 
-                // Step 2: Copy all data from old table to new table
                 database.execSQL(
                     """
-                    INSERT INTO `form_submissions_new` 
-                    SELECT * FROM `form_submissions`
-                    """.trimIndent()
-                )
-
-                // Step 3: Drop old table
-                database.execSQL("DROP TABLE `form_submissions`")
-
-                // Step 4: Rename new table to original name
-                database.execSQL(
-                    "ALTER TABLE `form_submissions_new` RENAME TO `form_submissions`"
-                )
-
-                // Step 5: Recreate indexes
-                database.execSQL(
-                    "CREATE INDEX IF NOT EXISTS `index_form_submissions_form_id` ON `form_submissions` (`form_id`)"
-                )
-                database.execSQL(
-                    "CREATE INDEX IF NOT EXISTS `index_form_submissions_sync_status` ON `form_submissions` (`sync_status`)"
-                )
-                database.execSQL(
-                    "CREATE INDEX IF NOT EXISTS `index_form_submissions_created_at` ON `form_submissions` (`created_at`)"
+            CREATE INDEX IF NOT EXISTS
+            index_form_submissions_idempotency_key
+            ON form_submissions(idempotency_key)
+            """.trimIndent()
                 )
             }
         }

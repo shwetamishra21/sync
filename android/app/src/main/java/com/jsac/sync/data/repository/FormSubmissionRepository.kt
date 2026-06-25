@@ -14,6 +14,7 @@ import com.jsac.sync.data.remote.dto.SubmitFormRequest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
+import java.util.UUID
 
 @Suppress("UNCHECKED_CAST")
 class FormSubmissionRepository @Inject constructor(
@@ -40,6 +41,7 @@ class FormSubmissionRepository @Inject constructor(
             form_id = formId,
             form_data = gson.toJson(formData),
             sync_status = SyncStatus.PENDING,
+            idempotencyKey = UUID.randomUUID().toString(),
             created_at = System.currentTimeMillis(),
             updated_at = System.currentTimeMillis()
         )
@@ -119,13 +121,41 @@ class FormSubmissionRepository @Inject constructor(
                     Exception("Cannot parse form_data JSON: ${e.message}")
                 )
             }
+            val extractedGpsLocation = try {
+
+                val gpsField = formData.entries.firstOrNull {
+                    it.key.contains("location", ignoreCase = true)
+                }?.value
+
+                if (!gpsField.isNullOrBlank() && gpsField.contains(",")) {
+
+                    val parts = gpsField.split(",")
+
+                    GpsLocation(
+                        latitude = parts[0].trim().toDouble(),
+                        longitude = parts[1].trim().toDouble()
+                    )
+
+                } else {
+                    null
+                }
+
+            } catch (e: Exception) {
+                null
+            }
+
+            Log.d(
+                "FormSubmissionRepository",
+                "GPS = ${extractedGpsLocation?.latitude}, ${extractedGpsLocation?.longitude}"
+            )
 
             // Create request
             val request = SubmitFormRequest(
                 formId = submission.form_id,
                 formData = formData,
                 submittedAt = submission.created_at,
-                gpsLocation = gpsLocation
+                gpsLocation = extractedGpsLocation,
+                idempotencyKey = submission.idempotencyKey
             )
 
             Log.d("FormSubmissionRepository", "   🌐 Preparing API call...")

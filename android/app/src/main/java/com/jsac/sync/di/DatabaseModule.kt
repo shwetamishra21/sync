@@ -61,14 +61,9 @@ object DatabaseModule {
     }
 
     // ============================================
-    // SYNC QUEUE DAO (NEW)
+    // NOTE: SyncQueueDao removed (dead code)
     // ============================================
-
-    @Provides
-    @Singleton
-    fun provideSyncQueueDao(
-        database: AppDatabase
-    ): SyncQueueDao {
-        return database.syncQueueDao()
-    }
+    // SyncQueueEntity and SyncQueueDao were never integrated
+    // into the actual sync flow. Removing unused code.
+    // If needed in future, re-add in new migration (v5).
 }

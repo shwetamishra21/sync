@@ -17,9 +17,7 @@ import androidx.navigation.fragment.findNavController
 import com.google.gson.Gson
 import com.jsac.sync.R
 import com.jsac.sync.data.local.db.entity.FormSubmissionEntity
-import com.jsac.sync.data.local.db.entity.MediaFileEntity
 import com.jsac.sync.data.repository.FormSubmissionRepository
-import com.jsac.sync.worker.SyncScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -147,7 +145,7 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
                         displaySubmission(submissionEntity)
 
                         // ✅ NEW: Display media files
-                        displayMediaFiles(submissionId)
+
 
                         hideLoading()
                     } else {
@@ -335,144 +333,13 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
     // ✅ NEW: DISPLAY MEDIA FILES
     // ============================================
 
-    private fun displayMediaFiles(submissionId: Int) {
-        Log.d("SubmissionDetailFragment", "📸 Loading media files for submission: $submissionId")
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                // Create container for media files
-                val mediaContainer = LinearLayout(requireContext()).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        setMargins(0, 24, 0, 0)
-                    }
-                    orientation = LinearLayout.VERTICAL
-                }
-
-                // Add header
-                val tvMediaHeader = TextView(requireContext()).apply {
-                    text = "📸 Attached Media"
-                    textSize = 16f
-                    setTypeface(null, Typeface.BOLD)
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        bottomMargin = 12
-                    }
-                }
-                mediaContainer.addView(tvMediaHeader)
-
-                // Get media files
-                repository.getMediaFilesBySubmissionId(submissionId).collect { mediaFiles ->
-                    if (mediaFiles.isEmpty()) {
-                        Log.d("SubmissionDetailFragment", "ℹ️ No media files for submission $submissionId")
-                        val tvNoMedia = TextView(requireContext()).apply {
-                            text = "No media files attached"
-                            textSize = 14f
-                            setTextColor(Color.GRAY)
-                            layoutParams = LinearLayout.LayoutParams(
-                                LinearLayout.LayoutParams.MATCH_PARENT,
-                                LinearLayout.LayoutParams.WRAP_CONTENT
-                            ).apply { topMargin = 8 }
-                        }
-                        mediaContainer.addView(tvNoMedia)
-                    } else {
-                        Log.d("SubmissionDetailFragment", "✅ Found ${mediaFiles.size} media file(s)")
-                        // Display each media file
-                        mediaFiles.forEach { media ->
-                            val mediaItemView = createMediaItemView(media)
-                            mediaContainer.addView(mediaItemView)
-                        }
-                    }
-
-                    // Add to container
-                    containerFormData.addView(mediaContainer)
-                }
-
-            } catch (e: Exception) {
-                Log.e("SubmissionDetailFragment", "Error loading media: ${e.message}", e)
-            }
-        }
-    }
 
     // ============================================
     // ✅ NEW: CREATE MEDIA ITEM VIEW
     // ============================================
 
-    private fun createMediaItemView(media: MediaFileEntity): LinearLayout {
-        val itemView = LinearLayout(requireContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 8, 0, 0) }
-            orientation = LinearLayout.VERTICAL
-            background = android.graphics.drawable.ColorDrawable(
-                Color.parseColor("#F5F5F5")
-            )
-            setPadding(12, 12, 12, 12)
-        }
 
-        // File name
-        val tvFileName = TextView(requireContext()).apply {
-            text = "📄 ${media.file_name}"
-            textSize = 14f
-            setTypeface(null, Typeface.BOLD)
-        }
-        itemView.addView(tvFileName)
-
-        // File info (size and type)
-        val fileSizeKB = media.file_size / 1024
-        val tvFileInfo = TextView(requireContext()).apply {
-            text = "Size: ${fileSizeKB}KB | Type: ${media.file_type}"
-            textSize = 12f
-            setTextColor(Color.GRAY)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 4 }
-        }
-        itemView.addView(tvFileInfo)
-
-        // Upload status with color
-        val (statusText, statusColor) = when (media.upload_status) {
-            "LOCAL" -> "⏳ Not uploaded yet" to Color.parseColor("#FFC107")
-            "UPLOADING" -> "🔄 Uploading..." to Color.parseColor("#2196F3")
-            "UPLOADED" -> "✅ Uploaded" to Color.parseColor("#4CAF50")
-            "FAILED" -> "❌ Upload failed" to Color.parseColor("#F44336")
-            else -> media.upload_status to Color.GRAY
-        }
-
-        val tvStatus = TextView(requireContext()).apply {
-            text = statusText
-            textSize = 12f
-            setTextColor(statusColor)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = 4 }
-        }
-        itemView.addView(tvStatus)
-
-        // If uploaded, show server URL
-        if (media.upload_status == "UPLOADED" && media.server_url != null) {
-            val tvServerUrl = TextView(requireContext()).apply {
-                text = "Server: ${media.server_url}"
-                textSize = 10f
-                setTextColor(Color.parseColor("#1976D2"))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = 4 }
-                isSelected = true
-            }
-            itemView.addView(tvServerUrl)
-        }
-
-        return itemView
-    }
 
     // ============================================
     // SYNC SUBMISSION

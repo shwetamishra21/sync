@@ -10,13 +10,16 @@ data class FormSubmissionRequest(
     val formId: String,
 
     @SerializedName("form_data")
-    val formData: Map<String, Any>,  // JSON object with all field values
+    val formData: Map<String, Any>,
 
     @SerializedName("submitted_at")
     val submittedAt: Long = System.currentTimeMillis(),
 
     @SerializedName("gps_location")
-    val gpsLocation: Map<String, Double>? = null  // {"lat": 25.5941, "lng": 85.1376}
+    val gpsLocation: Map<String, Double>? = null,
+
+    @SerializedName("idempotency_key")
+    val idempotencyKey: String
 )
 
 /**

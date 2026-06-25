@@ -1,7 +1,7 @@
 package com.jsac.sync.data.remote.dto
 
 import com.google.gson.annotations.SerializedName
-import java. util. UUID
+
 
 /**
  * Data Transfer Objects for form submissions
@@ -29,14 +29,23 @@ data class SubmitFormRequest(
     val gpsLocation: GpsLocation? = null,
 
     @SerializedName("idempotency_key")
-    val idempotencyKey: String = generateIdempotencyKey()  // ✅ ADD
+    val idempotencyKey: String
 )
 
-private fun generateIdempotencyKey(): String {
-    // Format: "<local_submission_id>_<timestamp>_<hash>"
-    // Ensures each submission has unique key, deterministic for retries
-    return UUID.randomUUID().toString()
-}
+/**
+ * Generate unique idempotency key for each submission
+ * Format: UUID-based unique identifier
+ * Ensures server can detect and prevent duplicate submissions on retry
+ *
+ * How it works:
+ * 1. Each submission gets a unique UUID when created
+ * 2. UUID is sent to server with every sync request
+ * 3. Server checks: is this UUID already in database?
+ * 4. If YES (duplicate): return original submission_id
+ * 5. If NO (new): create submission with this UUID, return new submission_id
+ *
+ * This prevents duplicate submissions when network timeout causes retry.
+ */
 
 data class GpsLocation(
     @SerializedName("lat")

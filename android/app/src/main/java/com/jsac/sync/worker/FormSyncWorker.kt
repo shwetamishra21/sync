@@ -16,10 +16,14 @@ import kotlinx.coroutines.runBlocking
 
 /**
  * ✅ ENHANCED: Sync worker with improved error logging and diagnostics
+ * ✅ FIX #6: Implements maximum retry attempt limits
  *
  * Can run in two modes (controlled by SyncScheduler):
  * - "sync all pending"      -> no submission_id in inputData
  * - "sync one submission"   -> submission_id present in inputData
+ *
+ * After MAX_SYNC_ATTEMPTS is exceeded, submissions are marked as FAILED
+ * and user must manually retry from submission list.
  */
 @HiltWorker
 class FormSyncWorker @AssistedInject constructor(
@@ -33,12 +37,48 @@ class FormSyncWorker @AssistedInject constructor(
         // ✅ Read this inside doWork(), not as a class property —
         // inputData is only guaranteed safe to read once work starts.
         val targetSubmissionId = inputData.getInt("submission_id", -1)
+        val maxAttempts = inputData.getInt("max_attempts", 8)  // ✅ NEW: Get max attempts from input
 
         Log.d("FormSyncWorker", "🔄 ═══════════════════════════════════════════════════")
         Log.d("FormSyncWorker", "🔄 Starting form sync worker")
         Log.d("FormSyncWorker", "   ID: $id")
-        Log.d("FormSyncWorker", "   Attempt: ${runAttemptCount + 1}")
+        Log.d("FormSyncWorker", "   Attempt: ${runAttemptCount + 1}/$maxAttempts")  // ✅ Show attempt count
         Log.d("FormSyncWorker", "🔄 ═══════════════════════════════════════════════════")
+
+        // ✅ FIX #6: CHECK ATTEMPT LIMIT BEFORE PROCEEDING
+        if (runAttemptCount >= maxAttempts) {
+            Log.e("FormSyncWorker", "")
+            Log.e("FormSyncWorker", "❌ ═══════════════════════════════════════════════════")
+            Log.e("FormSyncWorker", "❌ MAX ATTEMPTS EXCEEDED ($maxAttempts)")
+            Log.e("FormSyncWorker", "❌ Marking all pending submissions as FAILED")
+            Log.e("FormSyncWorker", "❌ User must manually retry from submission list")
+            Log.e("FormSyncWorker", "❌ ═══════════════════════════════════════════════════")
+
+            return@runBlocking try {
+                // Get all pending submissions and mark as failed
+                val pendingSubmissions = submissionRepository.getPendingSyncSubmissions(limit = 1000)
+                Log.d("FormSyncWorker", "Found ${pendingSubmissions.size} pending submissions to mark as failed")
+
+                for (submission in pendingSubmissions) {
+                    try {
+                        submissionRepository.markAsFailed(
+                            submission.id,
+                            "Exceeded maximum sync attempts ($maxAttempts). Server may be down. Please retry manually."
+                        )
+                        Log.d("FormSyncWorker", "  ✅ Marked submission #${submission.id} as FAILED")
+                    } catch (e: Exception) {
+                        Log.e("FormSyncWorker", "  ❌ Error marking submission #${submission.id} as failed: ${e.message}")
+                    }
+                }
+
+                Log.d("FormSyncWorker", "✅ All pending submissions marked as FAILED. Stopping retries.")
+                Result.success()  // ← GIVE UP, STOP RETRYING
+            } catch (e: Exception) {
+                Log.e("FormSyncWorker", "❌ Error during max attempts handling: ${e.message}")
+                e.printStackTrace()
+                Result.success()  // ← Still stop retrying
+            }
+        }
 
         return@runBlocking try {
             // ✅ STEP 1: Get token once (not per request)
@@ -181,7 +221,7 @@ class FormSyncWorker @AssistedInject constructor(
                     Result.retry()
                 }
                 else -> {
-                    Log.w("FormSyncWorker", "⏳ ALL FAILED - Will retry with exponential backoff")
+                    Log.w("FormSyncWorker", "⏳ ALL FAILED - Will retry with exponential backoff (attempt ${runAttemptCount + 1}/$maxAttempts)")
                     Result.retry()
                 }
             }
