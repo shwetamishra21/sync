@@ -1,11 +1,6 @@
 import os
-<<<<<<< HEAD
 from models.submission_model import FormSubmission
 from flask import Flask, request, jsonify
-=======
-import time
-from flask import Flask, request
->>>>>>> 1f8d224 (unstable state)
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 import jwt
@@ -20,6 +15,7 @@ from models.field_model import Field
 import json
 from functools import wraps
 import mimetypes
+from sqlalchemy.exc import IntegrityError  # ✅ NEW: Import for duplicate handling
 
 app = Flask(__name__)
 load_dotenv()
@@ -54,17 +50,7 @@ app.config["SECRET_KEY"] = "jsac_secret_key"
 reset_tokens = {}
 
 # ============================================
-<<<<<<< HEAD
 # MIDDLEWARE - JWT AUTHENTICATION
-=======
-# FORM SUBMISSION STORAGE (IN-MEMORY FOR NOW)
-# ============================================
-
-submissions_storage = {}  # form_id → [submissions]
-
-# ============================================
-# FORM TEMPLATES DATABASE
->>>>>>> 1f8d224 (unstable state)
 # ============================================
 
 def token_required(f):
@@ -447,11 +433,17 @@ def get_form_detail(form_id):
     except Exception as e:
         print(f"[FORMS] Error in get_form_detail: {str(e)}")
         return {"message": f"Error: {str(e)}"}, 500
+
+
 @app.route("/forms/submit", methods=["POST"])
 @token_required
 def submit_form(current_user):
     """
-    Submit a completed form
+    Submit a completed form with idempotency key support
+    
+    ✅ FIX #5: Prevents duplicate submissions from retried requests
+    Uses idempotency_key to detect if same submission already processed.
+    If duplicate detected, returns original submission_id.
     """
     print(f"\n[SUBMISSION] POST /forms/submit called by {current_user}")
 
@@ -468,6 +460,7 @@ def submit_form(current_user):
             "submitted_at",
             int(datetime.datetime.utcnow().timestamp() * 1000)
         )
+        idempotency_key = data.get("idempotency_key")  # ✅ NEW: Get idempotency key
 
         if not form_id or not form_data:
             print("[SUBMISSION] Missing form_id or form_data")
@@ -475,7 +468,30 @@ def submit_form(current_user):
                 "message": "form_id and form_data are required"
             }, 400
 
-        # Verify form exists
+        if not idempotency_key:  # ✅ NEW: Validate idempotency key
+            print("[SUBMISSION] Missing idempotency_key")
+            return {
+                "message": "idempotency_key is required"
+            }, 400
+
+        # ✅ STEP 1: Check for existing submission with same idempotency_key
+        print(f"[SUBMISSION] Checking for duplicate with idempotency_key: {idempotency_key}")
+        
+        existing_submission = FormSubmission.query.filter_by(
+            idempotency_key=idempotency_key
+        ).first()
+
+        if existing_submission:
+            print(f"[SUBMISSION] ✅ Duplicate detected! Returning existing submission #{existing_submission.id}")
+            return {
+                "status": "success",
+                "submission_id": str(existing_submission.id),
+                "message": "Submission already processed (duplicate request detected)",
+                "submitted_at": submitted_at,
+                "is_duplicate": True  # ✅ Flag to indicate this is a retry
+            }, 201
+
+        # ✅ STEP 2: Verify form exists
         form = Form.query.filter_by(
             id=form_id,
             is_active=True
@@ -487,9 +503,10 @@ def submit_form(current_user):
                 "message": f"Form {form_id} not found"
             }, 404
 
-        # Create submission record
+        # ✅ STEP 3: Create new submission record
         submission = FormSubmission(
             form_id=form_id,
+            idempotency_key=idempotency_key,  # ✅ STORE KEY
             sync_status="SYNCED",
             created_at=datetime.datetime.utcfromtimestamp(
                 submitted_at / 1000
@@ -502,24 +519,48 @@ def submit_form(current_user):
 
         # Store GPS location if provided
         gps_location = data.get("gps_location")
-
         if gps_location:
             submission.gps_latitude = gps_location.get("lat")
             submission.gps_longitude = gps_location.get("lng")
 
         db.session.add(submission)
-        db.session.commit()
+        
+        try:
+            db.session.commit()
+            print(f"[SUBMISSION] Form {form_id} submitted successfully - ID: {submission.id}")
 
-        print(
-            f"[SUBMISSION] Form {form_id} submitted - "
-            f"ID: {submission.id}"
-        )
+        except IntegrityError as e:
+            # ✅ Handle race condition: another request inserted same idempotency_key
+            db.session.rollback()
+            print(f"[SUBMISSION] Race condition detected: {str(e)}")
+            
+            # Retry lookup
+            existing_submission = FormSubmission.query.filter_by(
+                idempotency_key=idempotency_key
+            ).first()
+            
+            if existing_submission:
+                print(f"[SUBMISSION] ✅ Another request won, returning their submission #{existing_submission.id}")
+                return {
+                    "status": "success",
+                    "submission_id": str(existing_submission.id),
+                    "message": "Submission already processed (concurrent request detected)",
+                    "submitted_at": submitted_at,
+                    "is_duplicate": True
+                }, 201
+            else:
+                print(f"[SUBMISSION] ❌ IntegrityError but no duplicate found: {str(e)}")
+                return {
+                    "status": "error",
+                    "message": "Submission failed due to duplicate constraint"
+                }, 409
 
         return {
             "status": "success",
             "submission_id": str(submission.id),
             "message": "Form submitted successfully",
-            "submitted_at": submitted_at
+            "submitted_at": submitted_at,
+            "is_duplicate": False  # ✅ New submission
         }, 201
 
     except Exception as e:
@@ -534,6 +575,8 @@ def submit_form(current_user):
             "status": "error",
             "message": f"Error: {str(e)}"
         }, 500
+
+
 # ============================================
 # MEDIA UPLOAD ENDPOINT
 # ============================================
@@ -640,6 +683,8 @@ def upload_media(current_user):
             "status": "error",
             "message": str(e)
         }, 500
+
+
 # ============================================
 # SERVE UPLOADED FILES
 # ============================================
@@ -922,7 +967,6 @@ def delete_form(current_user, form_id):
         
         return {"message": "Form deleted successfully"}, 200
     
-    
     except Exception as e:
         db.session.rollback()
         print(f"[ADMIN] Error in delete_form: {str(e)}")
@@ -1087,146 +1131,6 @@ def delete_submission(submission_id):
             "status": "error",
             "message": str(e)
         }, 500
-
-# ============================================
-# FORM SUBMISSION ENDPOINTS (NEW)
-# ============================================
-
-@app.route("/forms/submit", methods=["POST"])
-def submit_form():
-    """
-    Accept a completed form submission from mobile app
-    
-    Request body:
-    {
-        "form_id": "form_001",
-        "form_data": {
-            "field_001": "John Doe",
-            "field_002": "john@example.com",
-            "field_003": "Birth Certificate"
-        },
-        "submitted_at": 1234567890,
-        "gps_location": {
-            "lat": 25.5941,
-            "lng": 85.1376
-        }
-    }
-    """
-    print("\n[SUBMISSION] POST /forms/submit called")
-    
-    try:
-        data = request.get_json()
-
-        form_id = data.get("form_id")
-        form_data = data.get("form_data")
-        submitted_at = data.get("submitted_at")
-        gps_location = data.get("gps_location")
-
-        # Validate required fields
-        if not form_id or not form_data:
-            print("[SUBMISSION] Missing form_id or form_data")
-            return {
-                "status": "error",
-                "message": "form_id and form_data are required"
-            }, 400
-
-        # Generate submission ID
-        submission_id = f"sub_{form_id}_{int(time.time() * 1000)}"
-
-        # Store in memory
-        if form_id not in submissions_storage:
-            submissions_storage[form_id] = []
-        
-        submission = {
-            "id": submission_id,
-            "form_data": form_data,
-            "submitted_at": submitted_at,
-            "gps_location": gps_location
-        }
-        
-        submissions_storage[form_id].append(submission)
-
-        # Log submission
-        print(f"\n{'='*60}")
-        print(f"✅ FORM SUBMISSION RECEIVED")
-        print(f"{'='*60}")
-        print(f"Submission ID: {submission_id}")
-        print(f"Form ID: {form_id}")
-        print(f"Submitted at: {submitted_at}")
-        print(f"Data: {form_data}")
-        if gps_location:
-            print(f"GPS: {gps_location}")
-        print(f"{'='*60}\n")
-
-        # TODO: In production, save to database
-        # TODO: Validate form_data against form schema
-        # TODO: Save GPS location if provided
-
-        return {
-            "status": "success",
-            "submission_id": submission_id,
-            "message": "Form submitted successfully",
-            "submitted_at": submitted_at
-        }, 201
-
-    except Exception as e:
-        print(f"[SUBMISSION] Error in submit_form: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
-
-
-@app.route("/submissions/<submission_id>", methods=["GET"])
-def get_submission(submission_id):
-    """
-    Get details of a previously submitted form
-    """
-    print(f"\n[SUBMISSION] GET /submissions/{submission_id}")
-    
-    try:
-        # Search for submission across all forms
-        for form_id, submissions in submissions_storage.items():
-            for submission in submissions:
-                if submission["id"] == submission_id:
-                    return {
-                        "status": "success",
-                        "submission": submission
-                    }, 200
-        
-        # Not found
-        return {
-            "status": "error",
-            "message": f"Submission {submission_id} not found"
-        }, 404
-
-    except Exception as e:
-        print(f"[SUBMISSION] Error: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
-
-
-@app.route("/forms/<form_id>/submissions", methods=["GET"])
-def get_form_submissions(form_id):
-    """
-    Get all submissions for a specific form
-    """
-    print(f"\n[SUBMISSION] GET /forms/{form_id}/submissions")
-    
-    try:
-        if form_id not in submissions_storage:
-            return {
-                "status": "success",
-                "submissions": []
-            }, 200
-        
-        submissions = submissions_storage[form_id]
-        
-        return {
-            "status": "success",
-            "submissions": submissions,
-            "count": len(submissions)
-        }, 200
-
-    except Exception as e:
-        print(f"[SUBMISSION] Error: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
 
 
 if __name__ == "__main__":

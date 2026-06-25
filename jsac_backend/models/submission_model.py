@@ -7,6 +7,11 @@ class FormSubmission(db.Model):
     Model for storing user form submissions
     Tracks submitted data, sync status, and submission metadata
     
+    FIX #5: Added idempotency_key for duplicate prevention
+    - Server checks idempotency_key before inserting
+    - If key exists, returns existing submission instead of creating duplicate
+    - Prevents duplicate submissions when worker retries
+    
     Status:
     - PENDING: Not yet synced to server
     - SYNCING: Currently uploading
@@ -39,6 +44,14 @@ class FormSubmission(db.Model):
         db.String(20),
         default="PENDING",
         comment="PENDING, SYNCING, SYNCED, FAILED"
+    )
+
+    # ✅ FIX #5: Idempotency key for duplicate prevention
+    idempotency_key = db.Column(
+        db.String(255),
+        unique=True,
+        nullable=False,
+        comment="UUID to detect duplicate submissions"
     )
 
     # Timestamps
