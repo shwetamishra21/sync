@@ -15,6 +15,7 @@ from models.field_model import Field
 import json
 from functools import wraps
 import mimetypes
+from sqlalchemy.exc import IntegrityError  # ✅ NEW: Import for duplicate handling
 
 app = Flask(__name__)
 load_dotenv()
@@ -432,11 +433,17 @@ def get_form_detail(form_id):
     except Exception as e:
         print(f"[FORMS] Error in get_form_detail: {str(e)}")
         return {"message": f"Error: {str(e)}"}, 500
+
+
 @app.route("/forms/submit", methods=["POST"])
 @token_required
 def submit_form(current_user):
     """
-    Submit a completed form
+    Submit a completed form with idempotency key support
+    
+    ✅ FIX #5: Prevents duplicate submissions from retried requests
+    Uses idempotency_key to detect if same submission already processed.
+    If duplicate detected, returns original submission_id.
     """
     print(f"\n[SUBMISSION] POST /forms/submit called by {current_user}")
 
@@ -453,6 +460,7 @@ def submit_form(current_user):
             "submitted_at",
             int(datetime.datetime.utcnow().timestamp() * 1000)
         )
+        idempotency_key = data.get("idempotency_key")  # ✅ NEW: Get idempotency key
 
         if not form_id or not form_data:
             print("[SUBMISSION] Missing form_id or form_data")
@@ -460,7 +468,30 @@ def submit_form(current_user):
                 "message": "form_id and form_data are required"
             }, 400
 
-        # Verify form exists
+        if not idempotency_key:  # ✅ NEW: Validate idempotency key
+            print("[SUBMISSION] Missing idempotency_key")
+            return {
+                "message": "idempotency_key is required"
+            }, 400
+
+        # ✅ STEP 1: Check for existing submission with same idempotency_key
+        print(f"[SUBMISSION] Checking for duplicate with idempotency_key: {idempotency_key}")
+        
+        existing_submission = FormSubmission.query.filter_by(
+            idempotency_key=idempotency_key
+        ).first()
+
+        if existing_submission:
+            print(f"[SUBMISSION] ✅ Duplicate detected! Returning existing submission #{existing_submission.id}")
+            return {
+                "status": "success",
+                "submission_id": str(existing_submission.id),
+                "message": "Submission already processed (duplicate request detected)",
+                "submitted_at": submitted_at,
+                "is_duplicate": True  # ✅ Flag to indicate this is a retry
+            }, 201
+
+        # ✅ STEP 2: Verify form exists
         form = Form.query.filter_by(
             id=form_id,
             is_active=True
@@ -472,9 +503,10 @@ def submit_form(current_user):
                 "message": f"Form {form_id} not found"
             }, 404
 
-        # Create submission record
+        # ✅ STEP 3: Create new submission record
         submission = FormSubmission(
             form_id=form_id,
+            idempotency_key=idempotency_key,  # ✅ STORE KEY
             sync_status="SYNCED",
             created_at=datetime.datetime.utcfromtimestamp(
                 submitted_at / 1000
@@ -487,24 +519,48 @@ def submit_form(current_user):
 
         # Store GPS location if provided
         gps_location = data.get("gps_location")
-
         if gps_location:
             submission.gps_latitude = gps_location.get("lat")
             submission.gps_longitude = gps_location.get("lng")
 
         db.session.add(submission)
-        db.session.commit()
+        
+        try:
+            db.session.commit()
+            print(f"[SUBMISSION] Form {form_id} submitted successfully - ID: {submission.id}")
 
-        print(
-            f"[SUBMISSION] Form {form_id} submitted - "
-            f"ID: {submission.id}"
-        )
+        except IntegrityError as e:
+            # ✅ Handle race condition: another request inserted same idempotency_key
+            db.session.rollback()
+            print(f"[SUBMISSION] Race condition detected: {str(e)}")
+            
+            # Retry lookup
+            existing_submission = FormSubmission.query.filter_by(
+                idempotency_key=idempotency_key
+            ).first()
+            
+            if existing_submission:
+                print(f"[SUBMISSION] ✅ Another request won, returning their submission #{existing_submission.id}")
+                return {
+                    "status": "success",
+                    "submission_id": str(existing_submission.id),
+                    "message": "Submission already processed (concurrent request detected)",
+                    "submitted_at": submitted_at,
+                    "is_duplicate": True
+                }, 201
+            else:
+                print(f"[SUBMISSION] ❌ IntegrityError but no duplicate found: {str(e)}")
+                return {
+                    "status": "error",
+                    "message": "Submission failed due to duplicate constraint"
+                }, 409
 
         return {
             "status": "success",
             "submission_id": str(submission.id),
             "message": "Form submitted successfully",
-            "submitted_at": submitted_at
+            "submitted_at": submitted_at,
+            "is_duplicate": False  # ✅ New submission
         }, 201
 
     except Exception as e:
@@ -519,6 +575,8 @@ def submit_form(current_user):
             "status": "error",
             "message": f"Error: {str(e)}"
         }, 500
+
+
 # ============================================
 # MEDIA UPLOAD ENDPOINT
 # ============================================
@@ -625,6 +683,8 @@ def upload_media(current_user):
             "status": "error",
             "message": str(e)
         }, 500
+
+
 # ============================================
 # SERVE UPLOADED FILES
 # ============================================
@@ -907,7 +967,6 @@ def delete_form(current_user, form_id):
         
         return {"message": "Form deleted successfully"}, 200
     
-    
     except Exception as e:
         db.session.rollback()
         print(f"[ADMIN] Error in delete_form: {str(e)}")
@@ -1072,6 +1131,7 @@ def delete_submission(submission_id):
             "status": "error",
             "message": str(e)
         }, 500
+
 
 if __name__ == "__main__":
     print("\n" + "="*50)
