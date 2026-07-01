@@ -83,6 +83,11 @@ class Field(db.Model):
         nullable=True,
         comment="JSON object with validation rules (min, max, pattern, etc.)"
     )
+    visible_if_json = db.Column(
+        db.Text,
+        nullable=True,
+        comment="JSON object defining field visibility rules"
+    )
 
     help_text = db.Column(
         db.String(500),
@@ -132,6 +137,22 @@ class Field(db.Model):
             self.validation_json = json.dumps(validation)
         else:
             self.validation_json = None
+    
+    def get_visible_if(self):
+        """Parse visibility rules JSON"""
+        if self.visible_if_json:
+            try:
+                return json.loads(self.visible_if_json)
+            except:
+                return {}
+        return {}
+
+    def set_visible_if(self, visible_if):
+        """Store visibility rules"""
+        if visible_if:
+            self.visible_if_json = json.dumps(visible_if)
+        else:
+            self.visible_if_json = None
 
     def to_dict(self):
         """Convert field to dictionary for API response"""
@@ -150,6 +171,12 @@ class Field(db.Model):
         # Include help text if present
         if self.help_text:
             result["help_text"] = self.help_text
+        validation = self.get_validation()
+        visible_if = self.get_visible_if()
+        if visible_if:
+            result["visible_if"] = visible_if
+        if validation:
+            result["validation"] = validation
 
         return result
 

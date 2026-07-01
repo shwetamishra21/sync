@@ -24,6 +24,32 @@ from models.form_model import Form
 from models.field_model import Field
 import json
 
+
+DEFAULT_THEME = {
+    "primaryColor": "#1976D2",
+    "secondaryColor": "#03A9F4",
+    "backgroundColor": "#FFFFFF",
+    "cardColor": "#FFFFFF",
+    "textColor": "#212121",
+    "buttonStyle": "filled",
+    "cornerRadius": 12,
+    "typography": "default"
+}
+
+DEFAULT_LAYOUT = {
+    "columns": 1,
+    "spacing": 16,
+    "fieldStyle": "outlined",
+    "labelPosition": "top"
+}
+
+DEFAULT_BRANDING = {
+    "logo": "",
+    "banner": "",
+    "organizationName": "JSAC",
+    "titleAlignment": "center"
+}
+
 def initialize_jharkhand_form():
     """
     Initialize Jharkhand resident details form
@@ -47,7 +73,11 @@ def initialize_jharkhand_form():
             id="form_jk_resident",
             name="Jharkhand Resident Registration",
             description="Complete resident registration form for Jharkhand state government services",
-            version="1.0"
+            version="1.0",
+
+            theme_json=DEFAULT_THEME.copy(),
+            layout_json=DEFAULT_LAYOUT.copy(),
+            branding_json=DEFAULT_BRANDING.copy()
         )
         
         db.session.add(jharkhand_form)
@@ -64,7 +94,11 @@ def initialize_jharkhand_form():
                 "required": True,
                 "placeholder": "Enter your full name as per Aadhar",
                 "field_order": 1,
-                "help_text": "Your legal name as registered in government records"
+                "help_text": "Your legal name as registered in government records",
+                "validation": {
+                    "minLength": 3,
+                    "maxLength": 100
+                },
             },
             {
                 "field_id": "jk_email",
@@ -73,7 +107,10 @@ def initialize_jharkhand_form():
                 "required": True,
                 "placeholder": "your.email@example.com",
                 "field_order": 2,
-                "help_text": "Valid email for communication"
+                "help_text": "Valid email for communication",
+                "validation": {
+                    "regex": r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
+                },
             },
             {
                 "field_id": "jk_phone",
@@ -82,7 +119,12 @@ def initialize_jharkhand_form():
                 "required": True,
                 "placeholder": "10-digit mobile number",
                 "field_order": 3,
-                "help_text": "WhatsApp enabled number preferred"
+                "help_text": "WhatsApp enabled number preferred",
+                "validation": {
+                    "minLength": 10,
+                    "maxLength": 10,
+                    "regex": r"^[0-9]{10}$"
+                },
             },
             {
                 "field_id": "jk_district",
@@ -118,7 +160,22 @@ def initialize_jharkhand_form():
                 "required": True,
                 "placeholder": "Enter your complete residential address (House no., Street, Village, Block, District, PIN)",
                 "field_order": 5,
-                "help_text": "Provide complete address for verification"
+                "help_text": "Provide complete address for verification",
+                "validation": {
+                    "minLength": 10,
+                    "maxLength": 250
+                },
+            },
+            {
+                "field_id": "jk_is_employed",
+                "name": "Currently Employed",
+                "type": "dropdown",
+                "required": True,
+                "field_order": 6,
+                "options": [
+                    "Yes",
+                    "No"
+            ]
             },
             {
                 "field_id": "jk_age",
@@ -126,8 +183,16 @@ def initialize_jharkhand_form():
                 "type": "number",
                 "required": False,
                 "placeholder": "Enter your age",
-                "field_order": 6,
-                "help_text": "Age in years"
+                "field_order": 7,
+                "help_text": "Age in years",
+                "validation": {
+                    "min": 1,
+                    "max": 120
+                    },
+                "visible_if": {
+                "field": "jk_is_employed",
+                "equals": "Yes"
+                }
             },
             {
                 "field_id": "jk_dob",
@@ -144,7 +209,12 @@ def initialize_jharkhand_form():
                 "type": "media",
                 "required": False,
                 "field_order": 8,
-                "help_text": "Upload a clear passport-size photo (JPG/PNG, max 5MB)"
+                "help_text": "Upload a clear passport-size photo (JPG/PNG, max 5MB)",
+                "validation": {
+                    "allowedExtensions":
+                    ["jpg","jpeg","png" ],
+                    "maxImageSizeMB": 5
+                },
             },
             {
                 "field_id": "jk_location",
@@ -172,6 +242,11 @@ def initialize_jharkhand_form():
             # Set options for dropdown
             if field_config["type"] == "dropdown" and "options" in field_config:
                 field.set_options(field_config["options"])
+            # Set validation rules
+            if "validation" in field_config:
+                field.set_validation(field_config["validation"])
+            if "visible_if" in field_config:
+                field.set_visible_if(field_config["visible_if"])
             
             db.session.add(field)
             print(f"  {i}. ✅ Added field: {field_config['name']} ({field_config['type']})")
@@ -190,6 +265,10 @@ def initialize_jharkhand_form():
         print(f"   Description: {form.description}")
         print(f"   Total Fields: {len(form.fields)}")
         print(f"   Version: {form.version}")
+        print("\n🎨 UI Configuration:")
+        print(f"   Theme: {form.theme_json}")
+        print(f"   Layout: {form.layout_json}")
+        print(f"   Branding: {form.branding_json}")
         
         print(f"\n📱 Field Summary:")
         for field in sorted(form.fields, key=lambda f: f.field_order):
@@ -319,14 +398,18 @@ def initialize_sample_forms():
             form = Form(
                 id=form_config["id"],
                 name=form_config["name"],
-                description=form_config.get("description", "")
+                description=form_config.get("description", ""),
+
+                theme_json=DEFAULT_THEME.copy(),
+                layout_json=DEFAULT_LAYOUT.copy(),
+                branding_json=DEFAULT_BRANDING.copy()
             )
             db.session.add(form)
             db.session.commit()
             
             for field_config in form_config.get("fields", []):
                 field = Field(
-                    form_id=form["id"],
+                    form_id=form.id,
                     field_id=field_config["field_id"],
                     name=field_config["name"],
                     type=field_config["type"],
@@ -337,6 +420,10 @@ def initialize_sample_forms():
                 
                 if field_config["type"] == "dropdown":
                     field.set_options(field_config.get("options", []))
+                if "validation" in field_config:
+                    field.set_validation(field_config["validation"])
+                if "visible_if" in field_config:
+                    field.set_visible_if(field_config["visible_if"])
                 
                 db.session.add(field)
             

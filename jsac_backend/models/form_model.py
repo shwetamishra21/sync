@@ -1,19 +1,11 @@
 from database.db import db
 import datetime
-import json
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 class Form(db.Model):
     """
-    Dynamic Form Model
-
-    Stores:
-    - Basic form information
-    - Theme configuration
-    - Layout configuration
-    - Branding configuration
-
-    Future UI should be completely driven from these configs.
+    Model for storing form templates in database.
     """
 
     __tablename__ = "forms"
@@ -40,33 +32,6 @@ class Form(db.Model):
         default="1.0"
     )
 
-    is_active = db.Column(
-        db.Boolean,
-        default=True
-    )
-
-    # ==========================
-    # Dynamic UI Configuration
-    # ==========================
-
-    theme_json = db.Column(
-        db.Text,
-        nullable=True,
-        comment="Theme configuration JSON"
-    )
-
-    layout_json = db.Column(
-        db.Text,
-        nullable=True,
-        comment="Layout configuration JSON"
-    )
-
-    branding_json = db.Column(
-        db.Text,
-        nullable=True,
-        comment="Branding configuration JSON"
-    )
-
     created_at = db.Column(
         db.DateTime,
         default=datetime.datetime.utcnow
@@ -78,6 +43,37 @@ class Form(db.Model):
         onupdate=datetime.datetime.utcnow
     )
 
+    is_active = db.Column(
+        db.Boolean,
+        default=True
+    )
+
+    # ----------------------------
+    # Dynamic UI Configuration
+    # ----------------------------
+
+    theme_json = db.Column(
+        JSONB,
+        nullable=False,
+        default=dict
+    )
+
+    layout_json = db.Column(
+        JSONB,
+        nullable=False,
+        default=dict
+    )
+
+    branding_json = db.Column(
+        JSONB,
+        nullable=False,
+        default=dict
+    )
+
+    # ----------------------------
+    # Relationship
+    # ----------------------------
+
     fields = db.relationship(
         "Field",
         backref="form",
@@ -85,76 +81,9 @@ class Form(db.Model):
         cascade="all, delete-orphan"
     )
 
-    # =====================================================
-    # Theme Helpers
-    # =====================================================
-
-    def get_theme(self):
-        if self.theme_json:
-            try:
-                return json.loads(self.theme_json)
-            except Exception:
-                pass
-
-        return {
-            "primaryColor": "#6200EE",
-            "accentColor": "#03DAC5",
-            "backgroundColor": "#FFFFFF",
-            "textColor": "#000000",
-            "buttonColor": "#6200EE",
-            "buttonTextColor": "#FFFFFF",
-            "cornerRadius": 8
-        }
-
-    def set_theme(self, theme):
-        self.theme_json = json.dumps(theme)
-
-    # =====================================================
-    # Layout Helpers
-    # =====================================================
-
-    def get_layout(self):
-        if self.layout_json:
-            try:
-                return json.loads(self.layout_json)
-            except Exception:
-                pass
-
-        return {
-            "columns": 1,
-            "showProgress": False,
-            "submitButtonPosition": "bottom",
-            "submitButtonText": "Submit"
-        }
-
-    def set_layout(self, layout):
-        self.layout_json = json.dumps(layout)
-
-    # =====================================================
-    # Branding Helpers
-    # =====================================================
-
-    def get_branding(self):
-        if self.branding_json:
-            try:
-                return json.loads(self.branding_json)
-            except Exception:
-                pass
-
-        return {
-            "organizationName": "",
-            "logoUrl": "",
-            "headerImage": ""
-        }
-
-    def set_branding(self, branding):
-        self.branding_json = json.dumps(branding)
-
-    # =====================================================
-    # API Responses
-    # =====================================================
-
     def to_dict(self):
+        """Used for /forms"""
+
         return {
             "id": self.id,
             "name": self.name,
@@ -165,16 +94,18 @@ class Form(db.Model):
         }
 
     def to_dict_with_fields(self):
-        return {
+        """Used for /forms/<form_id>"""
+
+        result = {
             "id": self.id,
             "name": self.name,
             "description": self.description,
             "version": self.version,
             "created_at": self.created_at.isoformat(),
 
-            "theme": self.get_theme(),
-            "layout": self.get_layout(),
-            "branding": self.get_branding(),
+            "theme": self.theme_json or {},
+            "layout": self.layout_json or {},
+            "branding": self.branding_json or {},
 
             "fields": [
                 field.to_dict()
@@ -184,6 +115,12 @@ class Form(db.Model):
                 )
             ]
         }
+
+        print("\n================ FORM RESPONSE ================")
+        print(result)
+        print("==============================================\n")
+
+        return result
 
     def __repr__(self):
         return f"<Form {self.id}: {self.name}>"
