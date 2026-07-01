@@ -7,6 +7,10 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import android.graphics.Color
+import com.jsac.sync.data.remote.dto.ThemeConfig
+import com.jsac.sync.data.remote.dto.LayoutConfig
+import com.jsac.sync.data.remote.dto.BrandingConfig
 import androidx.core.content.FileProvider
 import android.widget.Button
 import android.widget.EditText
@@ -41,6 +45,7 @@ import com.jsac.sync.utils.LocationHelper
  * - Validates required fields
  * - Offline-first submission (saves locally, syncs later)
  * - Shows submission status to user
+ * - Conditional visibility based on field values
  */
 @AndroidEntryPoint
 class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
@@ -59,6 +64,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
     private lateinit var progressBar: ProgressBar
     private lateinit var tvError: TextView
     private var currentForm: FormDetail? = null
+    private val fieldContainers = mutableMapOf<String, View>()
 
     private var pendingGpsFieldId: String? = null
     private var pendingMediaFieldId: String? = null
@@ -95,6 +101,8 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         fieldId,
                         uri.toString()
                     )
+
+                    updateConditionalVisibility()
 
                     Toast.makeText(
                         requireContext(),
@@ -152,6 +160,8 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         imagePath
                     )
 
+                    updateConditionalVisibility()
+
                     Log.d(
                         "FormDetailFragment",
                         "📸 Image path = $imagePath"
@@ -201,8 +211,26 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
 
         // Handle submit button
         btnSubmit.setOnClickListener {
-            if (currentForm != null) {
-                viewModel.submitForm(formId, currentForm!!)
+
+            currentForm?.let { form ->
+
+                val (isValid, message) = viewModel.validateForm(form)
+
+                if (isValid) {
+
+                    viewModel.submitForm(
+                        formId,
+                        form
+                    )
+
+                } else {
+
+                    Toast.makeText(
+                        requireContext(),
+                        message,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
     }
@@ -275,15 +303,25 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
     }
 
     private fun displayForm(form: FormDetail) {
+
         Log.d("FormDetailFragment", "📋 Displaying form with ${form.fields.size} fields")
 
+        currentForm = form
+
+        applyTheme(form.theme)
+        applyLayout(form.layout)
+        applyBranding(form.branding)
+
         tvFormDescription.text = form.description
+
         containerForm.removeAllViews()
 
-        // Create form fields dynamically
         for (field in form.fields) {
             createFormField(field)
         }
+
+        // ✅ FIX #1: Call updateConditionalVisibility after rendering all fields
+        updateConditionalVisibility()
     }
 
     private fun createFormField(field: FormField) {
@@ -292,7 +330,14 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, 16, 0, 0)
+                val spacing = currentForm?.layout?.spacing ?: 16
+
+                setMargins(
+                    0,
+                    spacing,
+                    0,
+                    0
+                )
             }
             orientation = LinearLayout.VERTICAL
         }
@@ -325,9 +370,21 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                     )
                     setPadding(12, 12, 12, 12)
                 }
+                currentForm?.layout?.let { layout ->
+
+                    if (layout.fieldStyle == "filled") {
+
+                        editText.setBackgroundColor(
+                            Color.parseColor("#F5F5F5")
+                        )
+
+                    }
+
+                }
 
                 editText.setOnTextChangedListener { text ->
                     viewModel.updateFieldValue(field.id, text.toString())
+                    updateConditionalVisibility()
                 }
 
                 fieldContainer.addView(editText)
@@ -343,11 +400,22 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                     )
                     setPadding(12, 12, 12, 12)
                 }
+                currentForm?.layout?.let { layout ->
+
+                    if (layout.fieldStyle == "filled") {
+
+                        editText.setBackgroundColor(
+                            Color.parseColor("#F5F5F5")
+                        )
+
+                    }
+
+                }
 
                 editText.setOnTextChangedListener { text ->
                     viewModel.updateFieldValue(field.id, text.toString())
+                    updateConditionalVisibility()
                 }
-
                 fieldContainer.addView(editText)
             }
 
@@ -363,9 +431,21 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                     )
                     setPadding(12, 12, 12, 12)
                 }
+                currentForm?.layout?.let { layout ->
+
+                    if (layout.fieldStyle == "filled") {
+
+                        editText.setBackgroundColor(
+                            Color.parseColor("#F5F5F5")
+                        )
+
+                    }
+
+                }
 
                 editText.setOnTextChangedListener { text ->
                     viewModel.updateFieldValue(field.id, text.toString())
+                    updateConditionalVisibility()
                 }
 
                 fieldContainer.addView(editText)
@@ -392,6 +472,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         override fun onItemSelected(parent: android.widget.AdapterView<*>, view: View?, position: Int, id: Long) {
                             val selected = field.options[position]
                             viewModel.updateFieldValue(field.id, selected)
+                            updateConditionalVisibility()
                         }
 
                         override fun onNothingSelected(parent: android.widget.AdapterView<*>) {}
@@ -411,9 +492,21 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                     )
                     setPadding(12, 12, 12, 12)
                 }
+                currentForm?.layout?.let { layout ->
+
+                    if (layout.fieldStyle == "filled") {
+
+                        editText.setBackgroundColor(
+                            Color.parseColor("#F5F5F5")
+                        )
+
+                    }
+
+                }
 
                 editText.setOnTextChangedListener { text ->
                     viewModel.updateFieldValue(field.id, text.toString())
+                    updateConditionalVisibility()
                 }
 
                 fieldContainer.addView(editText)
@@ -520,8 +613,10 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                 fieldContainer.addView(button)
             }
         }
+        fieldContainers[field.id] = fieldContainer
 
         containerForm.addView(fieldContainer)
+
     }
     private fun createImageFile(): File {
 
@@ -575,6 +670,9 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         value
                     )
 
+                    // ✅ FIX #2: Call updateConditionalVisibility after GPS capture
+                    updateConditionalVisibility()
+
                     Toast.makeText(
                         requireContext(),
                         "Location captured",
@@ -600,6 +698,124 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             }
         }
     }
+    private fun applyTheme(theme: ThemeConfig) {
+
+        try {
+
+            tvFormTitle.setTextColor(
+                Color.parseColor(theme.textColor)
+            )
+            when(theme.typography){
+
+                "large" -> {
+
+                    tvFormTitle.textSize = 24f
+
+                }
+
+                "small" -> {
+
+                    tvFormTitle.textSize = 16f
+
+                }
+
+                else -> {
+
+                    tvFormTitle.textSize = 20f
+
+                }
+
+            }
+
+            tvFormDescription.setTextColor(
+                Color.parseColor(theme.textColor)
+            )
+
+            btnSubmit.setBackgroundColor(
+                Color.parseColor(theme.primaryColor)
+            )
+            when(theme.buttonStyle){
+
+                "filled" -> {
+
+                    btnSubmit.elevation = 8f
+
+                }
+
+                "flat" -> {
+
+                    btnSubmit.elevation = 0f
+
+                }
+
+            }
+
+
+            requireView().setBackgroundColor(
+                Color.parseColor(theme.backgroundColor)
+            )
+
+
+        } catch (e: Exception) {
+
+            Log.e(
+                "Theme",
+                "Invalid color ${e.message}"
+            )
+        }
+    }
+    private fun applyLayout(layout: LayoutConfig) {
+
+        val spacing = layout.spacing
+
+        containerForm.setPadding(
+            spacing,
+            spacing,
+            spacing,
+            spacing
+        )
+    }
+    private fun applyBranding(
+        branding: BrandingConfig
+    ) {
+
+        tvFormTitle.text =
+            if (branding.organizationName.isNotBlank()) {
+                branding.organizationName
+            } else {
+                currentForm?.name ?: formName
+            }
+
+    }
+
+    private fun updateConditionalVisibility() {
+
+        val form = currentForm ?: return
+
+        for (field in form.fields) {
+
+            val container = fieldContainers[field.id] ?: continue
+
+            val rule = field.visible_if
+
+            if (rule == null) {
+
+                container.visibility = View.VISIBLE
+                continue
+            }
+
+            // ✅ ROBUSTNESS IMPROVEMENT: Trim and case-insensitive comparison
+            val currentValue = viewModel.getFieldValue(rule.field).trim()
+
+            container.visibility =
+                if (currentValue.equals(rule.equals.trim(), ignoreCase = true)) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+        }
+    }
+
 
     private fun showLoading() {
         progressBar.visibility = View.VISIBLE

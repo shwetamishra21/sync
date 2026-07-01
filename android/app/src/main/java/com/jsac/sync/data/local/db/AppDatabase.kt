@@ -36,6 +36,7 @@ import com.jsac.sync.data.local.db.entity.MediaFileEntity
     version = 5,  // ← INCREMENT VERSION
     exportSchema = false
 )
+
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun formDao(): FormDao

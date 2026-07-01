@@ -2,16 +2,15 @@ package com.jsac.sync.data.local.db.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.google.gson.annotations.SerializedName
 
 /**
- * Room entity for storing form metadata locally
+ * Room entity for storing form metadata locally.
  *
- * WHY: Allows offline access to list of available forms
- * Reduces API calls when user returns to dashboard
+ * Stores the complete UI configuration so forms can be rendered offline.
  */
 @Entity(tableName = "forms")
 data class FormEntity(
+
     @PrimaryKey
     val id: String,
 
@@ -21,7 +20,16 @@ data class FormEntity(
     val created_at: String,
     val field_count: Int,
 
-    // Metadata
-    val cached_at: Long = System.currentTimeMillis(),  // When we cached it
-    val is_downloaded: Boolean = false  // Full form with fields cached locally
+    // ===========================
+    // Dynamic UI Configuration
+    // ===========================
+
+
+    // ===========================
+    // Cache Metadata
+    // ===========================
+
+    val cached_at: Long = System.currentTimeMillis(),
+
+    val is_downloaded: Boolean = false
 )

@@ -121,6 +121,9 @@ class FormRepository @Inject constructor(
 
             if (response.isSuccessful && response.body() != null) {
                 val formDetail = response.body()!!.form
+                Log.d("API_TEST", formDetail.theme.toString())
+                Log.d("API_TEST", formDetail.layout.toString())
+                Log.d("API_TEST", formDetail.branding.toString())
                 Log.d("FormRepository", "✅ Got form detail with ${formDetail.fields.size} fields")
 
                 // Cache the complete form
@@ -151,8 +154,9 @@ class FormRepository @Inject constructor(
                 version = form.version,
                 created_at = form.created_at,
                 field_count = form.fields.size,
+
                 cached_at = System.currentTimeMillis(),
-                is_downloaded = true  // Mark as fully downloaded
+                is_downloaded = true
             )
             dao.insertForm(formEntity)
 
@@ -210,6 +214,8 @@ class FormRepository @Inject constructor(
                         version = form.version,
                         created_at = form.created_at,
                         field_count = form.field_count,
+
+
                         cached_at = System.currentTimeMillis(),
                         is_downloaded = false
                     )

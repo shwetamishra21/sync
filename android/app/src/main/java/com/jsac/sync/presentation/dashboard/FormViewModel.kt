@@ -24,6 +24,7 @@ import javax.inject.Inject
  * - Managing form state (data, validation)
  * - Submitting forms (offline-first)
  * - ✅ FIXED: Triggers sync after form submission
+ * - ✅ FIXED: Skips validation for hidden required fields
  */
 @HiltViewModel
 class FormDetailViewModel @Inject constructor(
@@ -90,8 +91,13 @@ class FormDetailViewModel @Inject constructor(
         formDataMap[fieldId] = value
     }
 
+
     fun getFormData(): Map<String, String> {
         return formDataMap.toMap()
+    }
+
+    fun getFieldValue(fieldId: String): String {
+        return formDataMap[fieldId] ?: ""
     }
 
     fun clearFormData() {
@@ -103,31 +109,78 @@ class FormDetailViewModel @Inject constructor(
     // ============================================
 
     fun validateForm(form: FormDetail): Pair<Boolean, String> {
-        Log.d("FormDetailViewModel", "🔍 Validating form")
 
         for (field in form.fields) {
-            if (field.required) {
-                val value = formDataMap[field.id]
 
-                if (value.isNullOrBlank()) {
-                    val errorMsg = "${field.name} is required"
-                    Log.d("FormDetailViewModel", "❌ Validation failed: $errorMsg")
-                    return Pair(false, errorMsg)
+            // ✅ FIX: Skip validation for hidden fields
+            if (isFieldHidden(field, form)) {
+                continue
+            }
+
+            val value = formDataMap[field.id].orEmpty()
+
+            if (field.required && value.isBlank()) {
+                return false to "${field.name} is required"
+            }
+
+            field.validation?.let { validation ->
+
+                validation.minLength?.let {
+                    if (value.length < it) {
+                        return false to "${field.name} must contain at least $it characters"
+                    }
                 }
 
-                // Email validation
-                if (field.type == "email") {
-                    if (!isValidEmail(value)) {
-                        val errorMsg = "${field.name} must be a valid email"
-                        Log.d("FormDetailViewModel", "❌ Validation failed: $errorMsg")
-                        return Pair(false, errorMsg)
+                validation.maxLength?.let {
+                    if (value.length > it) {
+                        return false to "${field.name} must contain at most $it characters"
                     }
+                }
+
+                validation.min?.let {
+                    value.toIntOrNull()?.let { number ->
+                        if (number < it) {
+                            return false to "${field.name} must be at least $it"
+                        }
+                    }
+                }
+
+                validation.max?.let {
+                    value.toIntOrNull()?.let { number ->
+                        if (number > it) {
+                            return false to "${field.name} must be at most $it"
+                        }
+                    }
+                }
+
+                validation.regex?.let { regex ->
+                    if (value.isNotBlank()) {
+                        if (!Regex(regex).matches(value)){
+                            return false to "${field.name} format is invalid"
+                        }
+                    }
+                }
+            }
+
+            if (field.type == "email" && value.isNotBlank()) {
+                if (!isValidEmail(value)) {
+                    return false to "Invalid email address"
                 }
             }
         }
 
-        Log.d("FormDetailViewModel", "✅ Form validation passed")
-        return Pair(true, "")
+        return true to ""
+    }
+
+    // ✅ NEW: Determine if a field is currently hidden
+    private fun isFieldHidden(field: FormField, form: FormDetail): Boolean {
+        val rule = field.visible_if ?: return false  // No rule = field is visible
+
+        val controllingFieldValue = formDataMap[rule.field].orEmpty().trim()
+        val expectedValue = rule.equals.trim()
+
+        // Field is hidden if controlling field doesn't match
+        return !controllingFieldValue.equals(expectedValue, ignoreCase = true)
     }
 
     private fun isValidEmail(email: String): Boolean {
