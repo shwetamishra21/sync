@@ -11,6 +11,13 @@ import androidx.navigation.fragment.findNavController
 import com.jsac.sync.R
 import dagger.hilt.android.AndroidEntryPoint
 
+/**
+ * ✅ FIXED: Updated for OTP-based password reset
+ * Changes:
+ * 1. Removed Reset Token field (OTP verification already done)
+ * 2. Only asks for New Password and Confirm Password
+ * 3. Simplified validation
+ */
 @AndroidEntryPoint
 class ResetPasswordFragment : Fragment(R.layout.fragment_reset_password) {
 
@@ -22,11 +29,9 @@ class ResetPasswordFragment : Fragment(R.layout.fragment_reset_password) {
     ) {
         super.onViewCreated(view, savedInstanceState)
 
-        // ✅ FIXED: Changed from getString("email") to getString("username")
-        // This matches the key that ForgotPasswordFragment passes
-        val email = arguments?.getString("username") ?: ""
+        // Get username from arguments (passed from OtpVerificationFragment)
+        val username = arguments?.getString("username") ?: ""
 
-        val etResetToken = view.findViewById<EditText>(R.id.etResetToken)
         val etNewPassword = view.findViewById<EditText>(R.id.etNewPassword)
         val etConfirmPassword = view.findViewById<EditText>(R.id.etConfirmPassword)
         val btnResetPassword = view.findViewById<Button>(R.id.btnResetPassword)
@@ -34,16 +39,10 @@ class ResetPasswordFragment : Fragment(R.layout.fragment_reset_password) {
 
         btnResetPassword.setOnClickListener {
 
-            val resetToken = etResetToken.text.toString().trim()
             val newPassword = etNewPassword.text.toString()
             val confirmPassword = etConfirmPassword.text.toString()
 
             // Validate inputs
-            if (resetToken.isEmpty()) {
-                Toast.makeText(requireContext(), "Enter reset token from your email", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
             if (newPassword.isEmpty()) {
                 Toast.makeText(requireContext(), "Password cannot be empty", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -60,9 +59,8 @@ class ResetPasswordFragment : Fragment(R.layout.fragment_reset_password) {
             }
 
             viewModel.resetPassword(
-                email,
-                resetToken,
-                newPassword,
+                username = username,
+                newPassword = newPassword,
                 onSuccess = {
                     Toast.makeText(
                         requireContext(),

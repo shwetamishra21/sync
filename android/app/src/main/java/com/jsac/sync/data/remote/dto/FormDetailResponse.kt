@@ -44,8 +44,8 @@ data class BrandingConfig(
     val organizationName: String = "",
     val titleAlignment: String = "center"
 )
-data class ValidationConfig(
 
+data class ValidationConfig(
     val min: Int? = null,
     val max: Int? = null,
 
@@ -57,7 +57,14 @@ data class ValidationConfig(
     val allowedExtensions: List<String>? = null,
     val maxImageSizeMB: Int? = null
 )
+
 data class VisibleIfConfig(
+    val field: String,
+    val equals: String
+)
+
+// ✅ NEW: Enable/Disable configuration
+data class EnabledIfConfig(
     val field: String,
     val equals: String
 )
@@ -72,5 +79,10 @@ data class FormField(
 
     val validation: ValidationConfig? = null,
 
-    val visible_if: VisibleIfConfig? = null
+    val visible_if: VisibleIfConfig? = null,
+
+    val enabled_if: EnabledIfConfig? = null,
+
+    // ✅ NEW: Backend-driven default value
+    val default_value: String? = null
 )

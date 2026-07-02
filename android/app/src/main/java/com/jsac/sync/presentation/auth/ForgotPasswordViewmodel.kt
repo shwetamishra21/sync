@@ -10,12 +10,11 @@ import org.json.JSONObject
 import javax.inject.Inject
 
 /**
- * ✅ FIXED: Multiple improvements:
- * 1. Changed parameter names from 'email' to 'username'
- * 2. Added better error logging to debug issues
- * 3. Added response body logging to see actual backend errors
- * 4. Fixed error message extraction from response (NEW - FIX #4)
- * 5. Parse JSON error responses instead of showing raw JSON to user
+ * ✅ FIXED: Updated for OTP-based password reset
+ * Changes:
+ * 1. resetPassword() no longer requires reset_token
+ * 2. Token verification is done via verify-otp endpoint instead
+ * 3. OTP is verified before reaching this fragment
  */
 @HiltViewModel
 class ForgotPasswordViewModel @Inject constructor(
@@ -42,7 +41,7 @@ class ForgotPasswordViewModel @Inject constructor(
 
                 if (response.isSuccessful) {
 
-                    Log.d("ForgotPasswordViewModel", "✅ Reset link sent to username: $username")
+                    Log.d("ForgotPasswordViewModel", "✅ OTP sent to: $username")
 
                     onSuccess()
 
@@ -50,7 +49,6 @@ class ForgotPasswordViewModel @Inject constructor(
 
                     Log.d("ForgotPasswordViewModel", "❌ Failed - Status: ${response.code()}")
 
-                    // ✅ FIXED (FIX #4): Parse error response to extract message
                     val errorMessage = try {
                         val errorBody = response.errorBody()?.string()
                         if (!errorBody.isNullOrEmpty()) {
@@ -79,7 +77,6 @@ class ForgotPasswordViewModel @Inject constructor(
 
     fun resetPassword(
         username: String,
-        resetToken: String,
         newPassword: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
@@ -91,7 +88,7 @@ class ForgotPasswordViewModel @Inject constructor(
 
             try {
 
-                val response = repository.resetPassword(username, resetToken, newPassword)
+                val response = repository.resetPassword(username, newPassword)
 
                 Log.d("ForgotPasswordViewModel", "📡 API Response Code: ${response.code()}")
                 Log.d("ForgotPasswordViewModel", "📡 API Response Body: ${response.body()}")
@@ -106,18 +103,17 @@ class ForgotPasswordViewModel @Inject constructor(
 
                     Log.d("ForgotPasswordViewModel", "❌ Reset failed - Status: ${response.code()}")
 
-                    // ✅ FIXED (FIX #4): Parse error response to extract message
                     val errorMessage = try {
                         val errorBody = response.errorBody()?.string()
                         if (!errorBody.isNullOrEmpty()) {
                             val json = JSONObject(errorBody)
-                            json.optString("message", "Invalid token or error occurred")
+                            json.optString("message", "Error resetting password")
                         } else {
-                            "Invalid token or error occurred"
+                            "Error resetting password"
                         }
                     } catch (e: Exception) {
                         Log.e("ForgotPasswordViewModel", "Error parsing error response: ${e.message}")
-                        "Invalid token or error occurred"
+                        "Error resetting password"
                     }
 
                     onError(errorMessage)

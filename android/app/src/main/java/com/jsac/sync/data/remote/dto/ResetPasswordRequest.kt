@@ -1,16 +1,19 @@
 package com.jsac.sync.data.remote.dto
 
 /**
- * ✅ FIXED: Changed 'email' field to 'username'
- * Flask backend expects: data.get('username'), not data.get('email')
+ * ✅ FIXED: Removed 'reset_token' field
+ * OTP verification is done separately via verify-otp endpoint.
+ * This request only needs username and new_password.
  *
- * This ensures consistency across the forgot password flow:
- * - User enters email/username on ForgotPasswordFragment
- * - Backend stores it as 'username' in memory
- * - ResetPasswordRequest must also use 'username' field
+ * Flow:
+ * 1. User enters email on ForgotPasswordFragment
+ * 2. Backend sends OTP
+ * 3. User enters OTP on OtpVerificationFragment
+ * 4. verify-otp endpoint validates OTP
+ * 5. User enters new password on ResetPasswordFragment
+ * 6. reset-password endpoint updates password (OTP already verified)
  */
 data class ResetPasswordRequest(
     val username: String,
-    val reset_token: String,
     val new_password: String
 )

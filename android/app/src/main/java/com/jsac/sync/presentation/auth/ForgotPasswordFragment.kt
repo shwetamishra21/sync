@@ -13,8 +13,13 @@ import com.jsac.sync.utils.EmailValidator
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
- * ✅ FIXED: Updated to pass 'username' parameter to ViewModel
- * This aligns with the backend's expectation of 'username' field
+ * ✅ FIXED: Updated to navigate to OTP Verification instead of Reset Password
+ * New flow:
+ * 1. User enters email
+ * 2. Backend sends OTP to email
+ * 3. Navigate to OTP Verification
+ * 4. User verifies OTP
+ * 5. Navigate to Reset Password
  */
 @AndroidEntryPoint
 class ForgotPasswordFragment : Fragment(R.layout.fragment_forgot_password) {
@@ -42,23 +47,23 @@ class ForgotPasswordFragment : Fragment(R.layout.fragment_forgot_password) {
                 return@setOnClickListener
             }
 
-            // ✅ FIXED: Pass email as 'username' parameter to match backend
+            // Send password reset request
             viewModel.requestPasswordReset(
-                email,  // This is the username from the backend perspective
+                email,
                 onSuccess = {
                     Toast.makeText(
                         requireContext(),
-                        "Reset link sent to your email",
+                        "OTP sent to your email. Check your inbox.",
                         Toast.LENGTH_SHORT
                     ).show()
 
-                    // Navigate to reset password screen with the username
+                    // ✅ FIXED: Navigate to OTP Verification (not Reset Password)
                     val bundle = Bundle().apply {
-                        putString("username", email)  // ✅ FIXED: Pass as 'username'
+                        putString("username", email)
                     }
 
                     findNavController().navigate(
-                        R.id.action_forgot_password_to_reset_password,
+                        R.id.action_forgot_password_to_otpVerificationFragment,
                         bundle
                     )
                 },

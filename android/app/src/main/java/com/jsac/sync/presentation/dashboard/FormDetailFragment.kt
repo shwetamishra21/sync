@@ -46,6 +46,8 @@ import com.jsac.sync.utils.LocationHelper
  * - Offline-first submission (saves locally, syncs later)
  * - Shows submission status to user
  * - Conditional visibility based on field values
+ * - Dynamic enable/disable based on field values
+ * - Backend-driven default values
  */
 @AndroidEntryPoint
 class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
@@ -65,6 +67,9 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
     private lateinit var tvError: TextView
     private var currentForm: FormDetail? = null
     private val fieldContainers = mutableMapOf<String, View>()
+
+    // ✅ NEW: Map to store input widgets for enable/disable control
+    private val fieldInputs = mutableMapOf<String, View>()
 
     private var pendingGpsFieldId: String? = null
     private var pendingMediaFieldId: String? = null
@@ -102,7 +107,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         uri.toString()
                     )
 
-                    updateConditionalVisibility()
+                    refreshDynamicRules()
 
                     Toast.makeText(
                         requireContext(),
@@ -160,7 +165,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         imagePath
                     )
 
-                    updateConditionalVisibility()
+                    refreshDynamicRules()
 
                     Log.d(
                         "FormDetailFragment",
@@ -320,8 +325,8 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             createFormField(field)
         }
 
-        // ✅ FIX #1: Call updateConditionalVisibility after rendering all fields
-        updateConditionalVisibility()
+        // ✅ Call refreshDynamicRules after rendering all fields
+        refreshDynamicRules()
     }
 
     private fun createFormField(field: FormField) {
@@ -363,6 +368,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
 
                 val editText = EditText(requireContext()).apply {
                     hint = field.placeholder ?: "Enter ${field.name}"
+                    setText(field.default_value ?: "")
                     inputType = inputType
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
@@ -382,10 +388,21 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
 
                 }
 
+                // ✅ NEW: Propagate default value to the ViewModel
+                field.default_value?.let {
+                    viewModel.updateFieldValue(
+                        field.id,
+                        it
+                    )
+                }
+
                 editText.setOnTextChangedListener { text ->
                     viewModel.updateFieldValue(field.id, text.toString())
-                    updateConditionalVisibility()
+                    refreshDynamicRules()
                 }
+
+                // ✅ Store input for enable/disable
+                fieldInputs[field.id] = editText
 
                 fieldContainer.addView(editText)
             }
@@ -393,6 +410,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             "email" -> {
                 val editText = EditText(requireContext()).apply {
                     hint = field.placeholder ?: "Enter email"
+                    setText(field.default_value ?: "")
                     inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
@@ -412,16 +430,29 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
 
                 }
 
+                // ✅ NEW: Propagate default value to the ViewModel
+                field.default_value?.let {
+                    viewModel.updateFieldValue(
+                        field.id,
+                        it
+                    )
+                }
+
                 editText.setOnTextChangedListener { text ->
                     viewModel.updateFieldValue(field.id, text.toString())
-                    updateConditionalVisibility()
+                    refreshDynamicRules()
                 }
+
+                // ✅ Store input for enable/disable
+                fieldInputs[field.id] = editText
+
                 fieldContainer.addView(editText)
             }
 
             "textarea" -> {
                 val editText = EditText(requireContext()).apply {
                     hint = field.placeholder ?: "Enter ${field.name}"
+                    setText(field.default_value ?: "")
                     inputType = android.text.InputType.TYPE_CLASS_TEXT or
                             android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
                     minLines = 4
@@ -443,10 +474,21 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
 
                 }
 
+                // ✅ NEW: Propagate default value to the ViewModel
+                field.default_value?.let {
+                    viewModel.updateFieldValue(
+                        field.id,
+                        it
+                    )
+                }
+
                 editText.setOnTextChangedListener { text ->
                     viewModel.updateFieldValue(field.id, text.toString())
-                    updateConditionalVisibility()
+                    refreshDynamicRules()
                 }
+
+                // ✅ Store input for enable/disable
+                fieldInputs[field.id] = editText
 
                 fieldContainer.addView(editText)
             }
@@ -468,16 +510,36 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                     adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                     spinner.adapter = adapter
 
+                    // ✅ NEW: Apply default value selection + propagate to ViewModel
+                    field.default_value?.let { defaultValue ->
+
+                        val index =
+                            field.options.indexOf(defaultValue)
+
+                        if (index >= 0) {
+
+                            spinner.setSelection(index)
+
+                            viewModel.updateFieldValue(
+                                field.id,
+                                defaultValue
+                            )
+                        }
+                    }
+
                     spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
                         override fun onItemSelected(parent: android.widget.AdapterView<*>, view: View?, position: Int, id: Long) {
                             val selected = field.options[position]
                             viewModel.updateFieldValue(field.id, selected)
-                            updateConditionalVisibility()
+                            refreshDynamicRules()
                         }
 
                         override fun onNothingSelected(parent: android.widget.AdapterView<*>) {}
                     }
                 }
+
+                // ✅ Store input for enable/disable
+                fieldInputs[field.id] = spinner
 
                 fieldContainer.addView(spinner)
             }
@@ -485,6 +547,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             "date" -> {
                 val editText = EditText(requireContext()).apply {
                     hint = "YYYY-MM-DD"
+                    setText(field.default_value ?: "")
                     inputType = android.text.InputType.TYPE_CLASS_DATETIME
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
@@ -504,13 +567,25 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
 
                 }
 
+                // ✅ NEW: Propagate default value to the ViewModel
+                field.default_value?.let {
+                    viewModel.updateFieldValue(
+                        field.id,
+                        it
+                    )
+                }
+
                 editText.setOnTextChangedListener { text ->
                     viewModel.updateFieldValue(field.id, text.toString())
-                    updateConditionalVisibility()
+                    refreshDynamicRules()
                 }
+
+                // ✅ Store input for enable/disable
+                fieldInputs[field.id] = editText
 
                 fieldContainer.addView(editText)
             }
+
             "media" -> {
 
                 val button = Button(requireContext()).apply {
@@ -575,6 +650,9 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         .show()
                 }
 
+                // ✅ Store input for enable/disable
+                fieldInputs[field.id] = button
+
                 fieldContainer.addView(button)
             }
 
@@ -609,6 +687,9 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         )
                     }
                 }
+
+                // ✅ Store input for enable/disable
+                fieldInputs[field.id] = button
 
                 fieldContainer.addView(button)
             }
@@ -670,8 +751,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         value
                     )
 
-                    // ✅ FIX #2: Call updateConditionalVisibility after GPS capture
-                    updateConditionalVisibility()
+                    refreshDynamicRules()
 
                     Toast.makeText(
                         requireContext(),
@@ -698,6 +778,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             }
         }
     }
+
     private fun applyTheme(theme: ThemeConfig) {
 
         try {
@@ -764,6 +845,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             )
         }
     }
+
     private fun applyLayout(layout: LayoutConfig) {
 
         val spacing = layout.spacing
@@ -775,6 +857,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             spacing
         )
     }
+
     private fun applyBranding(
         branding: BrandingConfig
     ) {
@@ -786,6 +869,12 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                 currentForm?.name ?: formName
             }
 
+    }
+
+    // ✅ NEW: Update conditional visibility and enabled state together
+    private fun refreshDynamicRules() {
+        updateConditionalVisibility()
+        updateConditionalEnabledState()
     }
 
     private fun updateConditionalVisibility() {
@@ -804,7 +893,6 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                 continue
             }
 
-            // ✅ ROBUSTNESS IMPROVEMENT: Trim and case-insensitive comparison
             val currentValue = viewModel.getFieldValue(rule.field).trim()
 
             container.visibility =
@@ -816,6 +904,35 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
         }
     }
 
+    // ✅ NEW: Update enabled/disabled state based on enabled_if rules
+    private fun updateConditionalEnabledState() {
+
+        val form = currentForm ?: return
+
+        for (field in form.fields) {
+
+            val input = fieldInputs[field.id] ?: continue
+
+            val rule = field.enabled_if
+
+            if (rule == null) {
+
+                input.isEnabled = true
+
+                continue
+            }
+
+            val currentValue = viewModel
+                .getFieldValue(rule.field)
+                .trim()
+
+            input.isEnabled =
+                currentValue.equals(
+                    rule.equals.trim(),
+                    ignoreCase = true
+                )
+        }
+    }
 
     private fun showLoading() {
         progressBar.visibility = View.VISIBLE

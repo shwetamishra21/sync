@@ -68,13 +68,32 @@
         android:name="com.jsac.sync.presentation.auth.ForgotPasswordFragment"
         android:label="Forgot Password">
 
+        <!-- ✅ FIXED: Navigate to OTP Verification (not directly to Reset Password) -->
         <action
-            android:id="@+id/action_forgot_password_to_reset_password"
-            app:destination="@id/resetPasswordFragment"/>
+            android:id="@+id/action_forgot_password_to_otpVerificationFragment"
+            app:destination="@id/otpVerificationFragment"/>
 
         <action
             android:id="@+id/action_forgot_password_to_login"
             app:destination="@id/loginFragment"/>
+    </fragment>
+
+    <!-- ============================================ -->
+    <!-- OTP VERIFICATION FRAGMENT (NEW) -->
+    <!-- ============================================ -->
+
+    <fragment
+        android:id="@+id/otpVerificationFragment"
+        android:name="com.jsac.sync.presentation.auth.OtpVerificationFragment"
+        android:label="OTP Verification">
+
+        <argument
+            android:name="username"
+            app:argType="string"/>
+
+        <action
+            android:id="@+id/action_otpVerificationFragment_to_resetPasswordFragment"
+            app:destination="@id/resetPasswordFragment"/>
     </fragment>
 
     <!-- ============================================ -->
@@ -85,6 +104,10 @@
         android:id="@+id/resetPasswordFragment"
         android:name="com.jsac.sync.presentation.auth.ResetPasswordFragment"
         android:label="Reset Password">
+
+        <argument
+            android:name="username"
+            app:argType="string"/>
 
         <action
             android:id="@+id/action_reset_password_to_login"
