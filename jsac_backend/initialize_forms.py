@@ -1,16 +1,13 @@
 """
 Script to initialize Jharkhand Resident Details Form
-This creates a complete form with 8 fields dynamically in the database
+This creates a complete form with dynamic fields in the database
 
-Fields:
-1. Full Name (text) - Required
-2. Email (email) - Required
-3. State District (dropdown) - Required
-4. Address (textarea)
-5. Age (number)
-6. Date of Birth (date)
-7. Profile Photo (media)
-8. Current Location (gps)
+Features Demonstrated:
+- Backend-driven Dynamic Fields
+- Validation Rules
+- Conditional Visibility (visible_if)
+- Conditional Enable/Disable (enabled_if)
+- Default Values (default_value)
 
 Run this script: python jsac_backend/initialize_forms.py
 """
@@ -127,11 +124,21 @@ def initialize_jharkhand_form():
                 },
             },
             {
+                "field_id": "jk_state",
+                "name": "State",
+                "type": "text",
+                "required": True,
+                "field_order": 4,
+                "help_text": "State name",
+                # ✅ NEW: Default value for state
+                "default_value": "Jharkhand"
+            },
+            {
                 "field_id": "jk_district",
                 "name": "District",
                 "type": "dropdown",
                 "required": True,
-                "field_order": 4,
+                "field_order": 5,
                 "help_text": "Select your district in Jharkhand",
                 "options": [
                     "Ranchi",
@@ -151,15 +158,17 @@ def initialize_jharkhand_form():
                     "Chatra",
                     "Khunti",
                     "Pakur"
-                ]
+                ],
+                # ✅ NEW: Default district
+                "default_value": "Ranchi"
             },
             {
                 "field_id": "jk_address",
                 "name": "Residential Address",
                 "type": "textarea",
                 "required": True,
-                "placeholder": "Enter your complete residential address (House no., Street, Village, Block, District, PIN)",
-                "field_order": 5,
+                "placeholder": "Enter your complete residential address",
+                "field_order": 6,
                 "help_text": "Provide complete address for verification",
                 "validation": {
                     "minLength": 10,
@@ -171,11 +180,10 @@ def initialize_jharkhand_form():
                 "name": "Currently Employed",
                 "type": "dropdown",
                 "required": True,
-                "field_order": 6,
-                "options": [
-                    "Yes",
-                    "No"
-            ]
+                "field_order": 7,
+                "options": ["Yes", "No"],
+                # ✅ NEW: Default to "No"
+                "default_value": "No"
             },
             {
                 "field_id": "jk_age",
@@ -183,15 +191,32 @@ def initialize_jharkhand_form():
                 "type": "number",
                 "required": False,
                 "placeholder": "Enter your age",
-                "field_order": 7,
+                "field_order": 8,
                 "help_text": "Age in years",
                 "validation": {
                     "min": 1,
                     "max": 120
-                    },
+                },
                 "visible_if": {
-                "field": "jk_is_employed",
-                "equals": "Yes"
+                    "field": "jk_is_employed",
+                    "equals": "Yes"
+                }
+            },
+            {
+                "field_id": "jk_salary",
+                "name": "Salary",
+                "type": "number",
+                "required": False,
+                "placeholder": "Enter your monthly salary",
+                "field_order": 9,
+                "help_text": "Monthly salary in rupees",
+                "validation": {
+                    "min": 0,
+                    "max": 9999999
+                },
+                "enabled_if": {
+                    "field": "jk_is_employed",
+                    "equals": "Yes"
                 }
             },
             {
@@ -200,7 +225,7 @@ def initialize_jharkhand_form():
                 "type": "date",
                 "required": False,
                 "placeholder": "YYYY-MM-DD",
-                "field_order": 7,
+                "field_order": 10,
                 "help_text": "Date of birth in YYYY-MM-DD format"
             },
             {
@@ -208,11 +233,10 @@ def initialize_jharkhand_form():
                 "name": "Profile Photo",
                 "type": "media",
                 "required": False,
-                "field_order": 8,
+                "field_order": 11,
                 "help_text": "Upload a clear passport-size photo (JPG/PNG, max 5MB)",
                 "validation": {
-                    "allowedExtensions":
-                    ["jpg","jpeg","png" ],
+                    "allowedExtensions": ["jpg","jpeg","png"],
                     "maxImageSizeMB": 5
                 },
             },
@@ -221,7 +245,7 @@ def initialize_jharkhand_form():
                 "name": "Current Location (GPS)",
                 "type": "gps",
                 "required": False,
-                "field_order": 9,
+                "field_order": 12,
                 "help_text": "Current GPS coordinates (auto-captured)"
             }
         ]
@@ -242,11 +266,22 @@ def initialize_jharkhand_form():
             # Set options for dropdown
             if field_config["type"] == "dropdown" and "options" in field_config:
                 field.set_options(field_config["options"])
+            
             # Set validation rules
             if "validation" in field_config:
                 field.set_validation(field_config["validation"])
+            
+            # Set visibility rules
             if "visible_if" in field_config:
                 field.set_visible_if(field_config["visible_if"])
+            
+            # Set enabled/disabled rules
+            if "enabled_if" in field_config:
+                field.set_enabled_if(field_config["enabled_if"])
+            
+            # ✅ NEW: Set default value
+            if "default_value" in field_config:
+                field.default_value = field_config["default_value"]
             
             db.session.add(field)
             print(f"  {i}. ✅ Added field: {field_config['name']} ({field_config['type']})")
@@ -273,38 +308,52 @@ def initialize_jharkhand_form():
         print(f"\n📱 Field Summary:")
         for field in sorted(form.fields, key=lambda f: f.field_order):
             required_badge = "🔴 Required" if field.required else "⚪ Optional"
-            print(f"   {field.field_order}. {field.name} ({field.type}) - {required_badge}")
+            visible_if = field.get_visible_if()
+            enabled_if = field.get_enabled_if()
+            
+            rules = []
+            if visible_if:
+                rules.append(f"visible_if={visible_if['field']}=={visible_if['equals']}")
+            if enabled_if:
+                rules.append(f"enabled_if={enabled_if['field']}=={enabled_if['equals']}")
+            if field.default_value:
+                rules.append(f"default={field.default_value}")
+            
+            rule_str = f" | {', '.join(rules)}" if rules else ""
+            print(f"   {field.field_order}. {field.name} ({field.type}) - {required_badge}{rule_str}")
         
         print("\n" + "="*70)
-        print("🔧 How to Modify Fields in Real-Time:")
+        print("✅ All Features Supported:")
         print("="*70)
         print("""
+✅ Dynamic Fields (text, email, number, date, dropdown, textarea, media, gps)
+✅ Validation Rules (min, max, minLength, maxLength, regex, allowedExtensions)
+✅ Conditional Visibility (visible_if)
+✅ Dynamic Enable/Disable (enabled_if)
+✅ Default Values (default_value)
+
+Example Usage:
+- State field starts with "Jharkhand"
+- District field starts with "Ranchi"
+- Employment field starts with "No"
+- Salary field is hidden AND disabled initially
+- When Employment = "Yes", Salary becomes visible AND enabled
+- All dynamic rules applied instantly!
+
+Backend API:
 1. UPDATE FIELD:
-   PUT http://localhost:5000/admin/forms/form_jk_resident/fields/[field_id]
-   {
-       "name": "New Name",
-       "required": true,
-       "field_order": 5
-   }
+   PUT /admin/forms/form_jk_resident/fields/[field_id]
 
 2. ADD NEW FIELD:
-   POST http://localhost:5000/admin/forms/form_jk_resident/fields
-   {
-       "field_id": "jk_aadhar",
-       "name": "Aadhar Number",
-       "type": "text",
-       "required": true,
-       "placeholder": "12-digit Aadhar number",
-       "field_order": 10
-   }
+   POST /admin/forms/form_jk_resident/fields
 
 3. DELETE FIELD:
-   DELETE http://localhost:5000/admin/forms/form_jk_resident/fields/[field_id]
+   DELETE /admin/forms/form_jk_resident/fields/[field_id]
 
 4. GET FORM (shown to users):
-   GET http://localhost:5000/forms/form_jk_resident
+   GET /forms/form_jk_resident
 
-✅ Changes are reflected INSTANTLY on all connected apps (no restart needed!)
+✅ Changes reflected INSTANTLY on all connected apps!
         """)
 
 
@@ -345,7 +394,8 @@ def initialize_sample_forms():
                         "type": "dropdown",
                         "required": True,
                         "field_order": 3,
-                        "options": ["Birth Certificate", "License", "Permit", "Other"]
+                        "options": ["Birth Certificate", "License", "Permit", "Other"],
+                        "default_value": "Birth Certificate"
                     },
                     {
                         "field_id": "cs_description",
@@ -376,7 +426,8 @@ def initialize_sample_forms():
                         "type": "dropdown",
                         "required": True,
                         "field_order": 2,
-                        "options": ["Residential", "Commercial", "Agricultural"]
+                        "options": ["Residential", "Commercial", "Agricultural"],
+                        "default_value": "Residential"
                     },
                     {
                         "field_id": "pr_area",
@@ -399,7 +450,6 @@ def initialize_sample_forms():
                 id=form_config["id"],
                 name=form_config["name"],
                 description=form_config.get("description", ""),
-
                 theme_json=DEFAULT_THEME.copy(),
                 layout_json=DEFAULT_LAYOUT.copy(),
                 branding_json=DEFAULT_BRANDING.copy()
@@ -424,6 +474,12 @@ def initialize_sample_forms():
                     field.set_validation(field_config["validation"])
                 if "visible_if" in field_config:
                     field.set_visible_if(field_config["visible_if"])
+                if "enabled_if" in field_config:
+                    field.set_enabled_if(field_config["enabled_if"])
+                
+                # ✅ NEW: Set default values
+                if "default_value" in field_config:
+                    field.default_value = field_config["default_value"]
                 
                 db.session.add(field)
             

@@ -22,6 +22,9 @@ class Field(db.Model):
     - Validation rules
     - Optional placeholder and help text
     - Support for dropdown options
+    - Conditional visibility (visible_if)
+    - Conditional enabling (enabled_if)
+    - Default values (default_value)
     """
     __tablename__ = "form_fields"
 
@@ -89,6 +92,20 @@ class Field(db.Model):
         comment="JSON object defining field visibility rules"
     )
 
+    # Dynamic enable/disable rules
+    enabled_if_json = db.Column(
+        db.Text,
+        nullable=True,
+        comment="JSON object defining field enabled/disabled rules"
+    )
+
+    # ✅ NEW: Backend supplied default value
+    default_value = db.Column(
+        db.Text,
+        nullable=True,
+        comment="Backend supplied default value"
+    )
+
     help_text = db.Column(
         db.String(500),
         nullable=True,
@@ -154,6 +171,22 @@ class Field(db.Model):
         else:
             self.visible_if_json = None
 
+    def get_enabled_if(self):
+        """Parse enabled_if JSON"""
+        if self.enabled_if_json:
+            try:
+                return json.loads(self.enabled_if_json)
+            except:
+                return {}
+        return {}
+
+    def set_enabled_if(self, enabled_if):
+        """Store enabled_if rules"""
+        if enabled_if:
+            self.enabled_if_json = json.dumps(enabled_if)
+        else:
+            self.enabled_if_json = None
+
     def to_dict(self):
         """Convert field to dictionary for API response"""
         result = {
@@ -171,12 +204,23 @@ class Field(db.Model):
         # Include help text if present
         if self.help_text:
             result["help_text"] = self.help_text
+        
         validation = self.get_validation()
         visible_if = self.get_visible_if()
+        enabled_if = self.get_enabled_if()
+        
         if visible_if:
             result["visible_if"] = visible_if
+        
+        if enabled_if:
+            result["enabled_if"] = enabled_if
+        
         if validation:
             result["validation"] = validation
+
+        # ✅ NEW: Include default_value if present
+        if self.default_value is not None:
+            result["default_value"] = self.default_value
 
         return result
 

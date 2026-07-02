@@ -4,6 +4,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 import jwt
+from flask_mail import Mail, Message
+import random
 import datetime
 from datetime import timedelta
 import secrets
@@ -15,10 +17,21 @@ from models.field_model import Field
 import json
 from functools import wraps
 import mimetypes
+import traceback
 from sqlalchemy.exc import IntegrityError  # ✅ NEW: Import for duplicate handling
 
 app = Flask(__name__)
 load_dotenv()
+print("MAIL_USERNAME =", os.getenv("MAIL_USERNAME"))
+print("MAIL_PASSWORD =", os.getenv("MAIL_PASSWORD"))
+app.config["MAIL_SERVER"] = os.getenv("MAIL_SERVER")
+app.config["MAIL_PORT"] = int(os.getenv("MAIL_PORT"))
+app.config["MAIL_USE_TLS"] = os.getenv("MAIL_USE_TLS") == "True"
+app.config["MAIL_USERNAME"] = os.getenv("MAIL_USERNAME")
+app.config["MAIL_PASSWORD"] = os.getenv("MAIL_PASSWORD")
+app.config["MAIL_DEFAULT_SENDER"] = os.getenv("MAIL_DEFAULT_SENDER")
+
+mail = Mail(app)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -47,7 +60,7 @@ bcrypt = Bcrypt(app)
 app.config["SECRET_KEY"] = "jsac_secret_key"
 
 # Store reset tokens (use database in production)
-reset_tokens = {}
+otp_store = {}
 
 # ============================================
 # MIDDLEWARE - JWT AUTHENTICATION
@@ -223,158 +236,183 @@ def login():
         return {"message": f"Error: {str(e)}"}, 500
 
 
+def send_otp_email(email, otp):
+
+    msg = Message(
+        subject="JSAC Password Reset OTP",
+        recipients=[email]
+    )
+
+    msg.body = f"""
+Hello,
+
+Your OTP for password reset is:
+
+{otp}
+
+This OTP is valid for 10 minutes.
+
+If you did not request this, ignore this email.
+
+JSAC
+"""
+
+    mail.send(msg)
+
 # ============================================
 # FORGOT PASSWORD ENDPOINTS
 # ============================================
 
-@app.route('/forgot-password', methods=['POST'])
+@app.route("/forgot-password", methods=["POST"])
 def forgot_password():
-    print("\n[PASSWORD] POST /forgot-password called")
-    
+
     try:
+
+        print("\n========== FORGOT PASSWORD ==========")
+
         data = request.get_json()
-        username = data.get('username')
-        
-        if not username:
-            print("[PASSWORD] Username is required")
-            return {"message": "Username is required"}, 400
-        
-        user = User.query.filter_by(
-            username=username
-        ).first()
-        
+
+        print("REQUEST:", data)
+
+        username = data.get("username")
+
+        print("USERNAME:", username)
+
+        user = User.query.filter_by(username=username).first()
+
+        print("USER FOUND:", user)
+
         if not user:
-            print(f"[PASSWORD] User {username} not found")
-            return {"message": "User not found"}, 404
-        
-        reset_token = secrets.token_urlsafe(32)
-        reset_tokens[reset_token] = {
-            'username': username,
-            'created_at': datetime.datetime.utcnow(),
-            'expires_at': datetime.datetime.utcnow() + timedelta(hours=1)
+            return {
+                "message": "User not found"
+            },404
+
+        otp = str(random.randint(100000,999999))
+
+        print("OTP:", otp)
+
+        otp_store[username] = {
+            "otp": otp,
+            "expires_at": datetime.datetime.utcnow() + timedelta(minutes=10),
+            "verified": False
         }
-        
-        print(f"\n{'='*50}")
-        print(f"Reset token for {username}:")
-        print(f"Token: {reset_token}")
-        print(f"Expires at: {reset_tokens[reset_token]['expires_at']}")
-        print(f"{'='*50}\n")
-        
+
+        print("Calling send_otp_email()...")
+
+        send_otp_email(username, otp)
+
+        print("OTP email sent successfully.")
+
         return {
-            "message": "Reset link sent",
-            "reset_token": reset_token
-        }, 200
-    
+            "message":"OTP sent successfully"
+        },200
+
     except Exception as e:
-        print(f"[PASSWORD] Error in forgot_password: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
 
+        import traceback
+        traceback.print_exc()
 
-@app.route('/reset-password', methods=['POST'])
-def reset_password():
-    print("\n[PASSWORD] POST /reset-password called")
-    
+        return {
+            "message": str(e)
+        },500
+@app.route("/verify-otp", methods=["POST"])
+def verify_otp():
+
     try:
+
         data = request.get_json()
-        username = data.get('username')
-        reset_token = data.get('reset_token')
-        new_password = data.get('new_password')
-        
-        if not all([username, reset_token, new_password]):
-            print("[PASSWORD] Missing required fields")
-            return {"message": "Username, token, and password are required"}, 400
-        
-        if len(new_password) < 6:
-            print("[PASSWORD] Password too short")
-            return {"message": "Password must be at least 6 characters"}, 400
-        
-        if reset_token not in reset_tokens:
-            print("[PASSWORD] Invalid or expired token")
-            return {"message": "Invalid or expired token"}, 400
-        
-        token_data = reset_tokens[reset_token]
-        
-        if token_data['username'] != username:
-            print("[PASSWORD] Username does not match token")
-            return {"message": "Username does not match token"}, 400
-        
-        if datetime.datetime.utcnow() > token_data['expires_at']:
-            del reset_tokens[reset_token]
-            print("[PASSWORD] Token has expired")
-            return {"message": "Token has expired"}, 400
-        
+
+        username = data.get("username")
+        otp = data.get("otp")
+
+        if username not in otp_store:
+
+            return {
+                "message":"OTP expired"
+            },400
+
+        record = otp_store[username]
+
+        if datetime.datetime.utcnow() > record["expires_at"]:
+
+            del otp_store[username]
+
+            return {
+                "message":"OTP expired"
+            },400
+
+        if otp != record["otp"]:
+
+            return {
+                "message":"Invalid OTP"
+            },400
+
+        record["verified"] = True
+
+        return {
+            "message":"OTP verified"
+        },200
+
+    except Exception as e:
+
+        return {
+            "message":str(e)
+        },500
+
+@app.route("/reset-password", methods=["POST"])
+def reset_password():
+
+    try:
+
+        data = request.get_json()
+
+        username = data.get("username")
+        new_password = data.get("new_password")
+
+        if username not in otp_store:
+
+            return {
+                "message":"OTP verification required"
+            },400
+
+        record = otp_store[username]
+
+        if not record["verified"]:
+
+            return {
+                "message":"OTP not verified"
+            },400
+
         user = User.query.filter_by(
             username=username
         ).first()
-        
+
         if not user:
-            print(f"[PASSWORD] User {username} not found")
-            return {"message": "User not found"}, 404
-        
-        hashed_password = bcrypt.generate_password_hash(
+
+            return {
+                "message":"User not found"
+            },404
+
+        user.password = bcrypt.generate_password_hash(
             new_password
         ).decode("utf-8")
-        user.password = hashed_password
-        
+
         db.session.commit()
-        
-        print(f"\n{'='*50}")
-        print(f"Password reset for: {username}")
-        print(f"{'='*50}\n")
-        
-        del reset_tokens[reset_token]
-        
-        return {"message": "Password reset successfully"}, 200
-    
-    except Exception as e:
-        db.session.rollback()
-        print(f"[PASSWORD] Error in reset_password: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
 
+        del otp_store[username]
 
-@app.route('/check-reset-token', methods=['POST'])
-def check_reset_token():
-    print("\n[PASSWORD] POST /check-reset-token called")
-    
-    try:
-        data = request.get_json()
-        reset_token = data.get('reset_token')
-        
-        if not reset_token:
-            print("[PASSWORD] Token is required")
-            return {"message": "Token is required"}, 400
-        
-        if reset_token not in reset_tokens:
-            print("[PASSWORD] Invalid or expired token")
-            return {
-                "valid": False,
-                "message": "Invalid or expired token"
-            }, 400
-        
-        token_data = reset_tokens[reset_token]
-        
-        if datetime.datetime.utcnow() > token_data['expires_at']:
-            del reset_tokens[reset_token]
-            print("[PASSWORD] Token has expired")
-            return {
-                "valid": False,
-                "message": "Token has expired"
-            }, 400
-        
-        time_remaining = token_data['expires_at'] - datetime.datetime.utcnow()
-        
-        print(f"[PASSWORD] Token is valid, {int(time_remaining.total_seconds())}s remaining")
-        
         return {
-            "valid": True,
-            "username": token_data['username'],
-            "expires_at": token_data['expires_at'].isoformat(),
-            "time_remaining_seconds": int(time_remaining.total_seconds())
-        }, 200
-    
+            "message":"Password reset successfully"
+        },200
+
     except Exception as e:
-        print(f"[PASSWORD] Error in check_reset_token: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
+
+        db.session.rollback()
+
+        return {
+            "message":str(e)
+        },500
+
 
 
 # ============================================
@@ -566,10 +604,8 @@ def submit_form(current_user):
     except Exception as e:
         db.session.rollback()
 
-        print(
-            f"[SUBMISSION] Error in submit_form: {str(e)}",
-            exc_info=True
-        )
+        print(f"[SUBMISSION] Error in submit_form: {str(e)}")
+        traceback.print_exc()
 
         return {
             "status": "error",
