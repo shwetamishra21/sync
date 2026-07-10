@@ -190,12 +190,16 @@ class Field(db.Model):
     def to_dict(self):
         """Convert field to dictionary for API response"""
         result = {
+            "db_id": self.id,
             "id": self.field_id,
             "name": self.name,
             "type": self.type,
             "required": self.required,
-            "placeholder": self.placeholder
-        }
+            "placeholder": self.placeholder,
+            "field_order": self.field_order,
+            "help_text": self.help_text,
+            "default_value": self.default_value,
+            }
 
         # Include options if dropdown/select type
         if self.type in ["dropdown", "select"]:

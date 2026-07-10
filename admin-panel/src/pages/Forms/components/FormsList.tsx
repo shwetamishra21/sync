@@ -1,52 +1,68 @@
-import MoreVertIcon from "@mui/icons-material/MoreVert";
+// src/pages/Forms/components/FormsList.tsx - UPDATED
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-
 import {
   Box,
   Card,
   Chip,
   Divider,
-  IconButton,
-  Stack,
   Typography,
 } from "@mui/material";
+import type { FormSummary } from "../../../types/form";
+import FormActionsMenu from "./FormActionsMenu";
 
-const forms = [
-  {
-    id: 1,
-    name: "Resident Registration",
-    description: "Government citizen registration form",
-    version: "1.0",
-    fields: 9,
-    updated: "Today",
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Water Survey",
-    description: "Village water source survey",
-    version: "2.1",
-    fields: 6,
-    updated: "Yesterday",
-    status: "Draft",
-  },
-  {
-    id: 3,
-    name: "Farmer Registration",
-    description: "Farmer welfare registration form",
-    version: "1.3",
-    fields: 14,
-    updated: "2 days ago",
-    status: "Active",
-  },
-];
+interface Props {
+  forms: FormSummary[];
+  onBuilder: (form: FormSummary) => void;
+  onEdit: (form: FormSummary) => void;
+  onDelete: (form: FormSummary) => void;
+  onToggleActive: (form: FormSummary) => void;
+}
 
-export default function FormsList() {
+const formatDate = (date: string) =>
+  new Date(date).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+export default function FormsList({
+  forms,
+  onBuilder,
+  onEdit,
+  onDelete,
+  onToggleActive,
+}: Props) {
+  if (forms.length === 0) {
+    return (
+      <Card
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "divider",
+          py: 8,
+          textAlign: "center",
+        }}
+      >
+        <Typography variant="h6">
+          No Forms Available
+        </Typography>
+
+        <Typography
+          color="text.secondary"
+          sx={{ mt: 1 }}
+        >
+          Create your first dynamic form to get started.
+        </Typography>
+      </Card>
+    );
+  }
+
   return (
     <Card
       elevation={0}
       sx={{
-        borderRadius: 4,
+        borderRadius: 3,
         border: "1px solid",
         borderColor: "divider",
         overflow: "hidden",
@@ -58,27 +74,30 @@ export default function FormsList() {
             sx={{
               px: 3,
               py: 2.5,
-              transition: "0.2s",
               cursor: "pointer",
-
+              transition: ".2s",
               "&:hover": {
-                bgcolor: "#F8FAFC",
+                bgcolor: "action.hover",
               },
             }}
           >
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="flex-start"
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 2,
+              }}
             >
-              <Stack spacing={1}>
-                <Stack
-                  direction="row"
-                  spacing={1.5}
-                  alignItems="center"
+              <Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                  }}
                 >
                   <DescriptionOutlinedIcon color="primary" />
-
                   <Typography
                     variant="h6"
                     sx={{
@@ -87,48 +106,54 @@ export default function FormsList() {
                   >
                     {form.name}
                   </Typography>
-
                   <Chip
-                    label={form.status}
+                    label={
+                      (form.is_active ?? true)
+                        ? "Active"
+                        : "Inactive"
+                    }
                     size="small"
                     color={
-                      form.status === "Active"
+                      (form.is_active ?? true)
                         ? "success"
-                        : "warning"
+                        : "default"
                     }
                   />
-                </Stack>
-
+                </Box>
                 <Typography
                   color="text.secondary"
                   sx={{
-                    fontSize: 14,
+                    mt: 1,
+                    maxWidth: 700,
                   }}
                 >
                   {form.description}
                 </Typography>
-
                 <Typography
+                  variant="body2"
                   color="text.secondary"
                   sx={{
-                    fontSize: 13,
+                    mt: 0.5,
                   }}
                 >
                   Version {form.version}
                   {" • "}
-                  {form.fields} Fields
+                  {form.field_count}{" "}
+                  {form.field_count === 1 ? "Field" : "Fields"}
                   {" • "}
-                  Updated {form.updated}
+                  Created {formatDate(form.created_at)}
                 </Typography>
-              </Stack>
-
-              <IconButton>
-                <MoreVertIcon />
-              </IconButton>
-            </Stack>
+              </Box>
+              <FormActionsMenu
+                form={form}
+                onBuilder={onBuilder}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onToggleActive={onToggleActive}
+              />
+            </Box>
           </Box>
-
-          {index < forms.length - 1 && <Divider />}
+          {index !== forms.length - 1 && <Divider />}
         </Box>
       ))}
     </Card>

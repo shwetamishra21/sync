@@ -1,3 +1,4 @@
+// FormsToolbar.tsx - FIXED
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -6,33 +7,61 @@ import {
   Button,
   InputAdornment,
   MenuItem,
-  Stack,
   TextField,
 } from "@mui/material";
 
-export default function FormsToolbar() {
+interface Props {
+  search: string;
+  onSearchChange: (value: string) => void;
+  onCreate: () => void;
+}
+
+export default function FormsToolbar({
+  search,
+  onSearchChange,
+  onCreate,
+}: Props) {
   return (
-    <Stack
-      direction={{ xs: "column", md: "row" }}
-      spacing={2}
-      justifyContent="space-between"
-      alignItems={{ xs: "stretch", md: "center" }}
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: {
+          xs: "column",
+          md: "row",
+        },
+        gap: 2,
+        justifyContent: "space-between",
+        alignItems: {
+          xs: "stretch",
+          md: "center",
+        },
+      }}
     >
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        sx={{ flex: 1 }}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: {
+            xs: "column",
+            sm: "row",
+          },
+          gap: 2,
+          flex: 1,
+        }}
       >
         <TextField
           size="small"
           placeholder="Search forms..."
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
           sx={{ minWidth: 320 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            },
           }}
         />
 
@@ -47,11 +76,12 @@ export default function FormsToolbar() {
           <MenuItem value="inactive">Inactive</MenuItem>
           <MenuItem value="draft">Draft</MenuItem>
         </TextField>
-      </Stack>
+      </Box>
 
       <Button
         variant="contained"
         startIcon={<AddIcon />}
+        onClick={onCreate}
         sx={{
           borderRadius: 3,
           px: 3,
@@ -60,6 +90,6 @@ export default function FormsToolbar() {
       >
         Create Form
       </Button>
-    </Stack>
+    </Box>
   );
 }

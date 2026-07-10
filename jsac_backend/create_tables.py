@@ -1,4 +1,5 @@
 from app import app
+from models.admin_model import Admin
 from database.db import db
 
 with app.app_context():

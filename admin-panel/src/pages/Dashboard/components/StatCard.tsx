@@ -1,41 +1,66 @@
-import { Button, Card, CardContent, Stack, Typography } from "@mui/material";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+} from "@mui/material";
 
-export default function QuickActions() {
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  color?: string;
+}
+
+export default function StatCard({
+  title,
+  value,
+  color = "#1976D2",
+}: StatCardProps) {
   return (
     <Card
-      elevation={0}
       sx={{
-        border: "1px solid #E5E7EB",
+        height: "100%",
         borderRadius: 3,
+        border: "1px solid",
+        borderColor: "divider",
+        boxShadow: "0 4px 12px rgba(0,0,0,.05)",
       }}
     >
       <CardContent>
-        <Typography
-          variant="h6"
+        <Box
           sx={{
-            mb: 3,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          Quick Actions
-        </Typography>
+          <Box>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+            >
+              {title}
+            </Typography>
 
-        <Stack spacing={2}>
-          <Button variant="contained" fullWidth>
-            Create Form
-          </Button>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                mt: 0.5,
+              }}
+            >
+              {value}
+            </Typography>
+          </Box>
 
-          <Button variant="outlined" fullWidth>
-            Preview Form
-          </Button>
-
-          <Button variant="outlined" fullWidth>
-            Theme Editor
-          </Button>
-
-          <Button variant="outlined" fullWidth>
-            Publish
-          </Button>
-        </Stack>
+          <TrendingUpIcon
+            sx={{
+              color,
+              fontSize: 40,
+            }}
+          />
+        </Box>
       </CardContent>
     </Card>
   );

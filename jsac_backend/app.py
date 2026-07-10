@@ -12,6 +12,7 @@ import secrets
 from dotenv import load_dotenv
 from database.db import db
 from models.user_model import User
+from models.admin_model import Admin
 from models.form_model import Form
 from models.field_model import Field
 import json
@@ -235,6 +236,63 @@ def login():
         print(f"[AUTH] Error in login: {str(e)}")
         return {"message": f"Error: {str(e)}"}, 500
 
+@app.route("/admin/login", methods=["POST"])
+def admin_login():
+
+    print("\n[ADMIN] POST /admin/login")
+
+    try:
+
+        data = request.get_json()
+
+        email = data.get("email")
+
+        password = data.get("password")
+
+        if not email or not password:
+            return {
+                "message": "Email and password are required"
+            },400
+
+        admin = Admin.query.filter_by(
+            email=email
+        ).first()
+
+        if not admin:
+            return {
+                "message":"Invalid credentials"
+            },401
+
+        if not bcrypt.check_password_hash(
+            admin.password,
+            password
+        ):
+            return {
+                "message":"Invalid credentials"
+            },401
+
+        token = jwt.encode(
+            {
+                "username": email,
+                "exp":
+                datetime.datetime.utcnow()
+                + datetime.timedelta(days=1)
+            },
+            app.config["SECRET_KEY"],
+            algorithm="HS256"
+        )
+
+        return {
+            "status":"success",
+            "token": token,
+            "email": email
+        },200
+
+    except Exception as e:
+
+        return {
+            "message": str(e)
+        },500
 
 def send_otp_email(email, otp):
 
@@ -443,6 +501,66 @@ def get_forms():
     except Exception as e:
         print(f"[FORMS] Error in get_forms: {str(e)}")
         return {"message": f"Error: {str(e)}"}, 500
+
+
+@app.route("/admin/forms", methods=["GET"])
+@token_required
+def get_admin_forms(current_user):
+    """
+    Get all forms for the Admin Panel (including inactive forms)
+    """
+    print(f"\n[ADMIN] GET /admin/forms called by {current_user}")
+
+    try:
+        forms = Form.query.all()
+
+        form_list = [form.to_dict() for form in forms]
+
+        return {
+            "status": "success",
+            "forms": form_list,
+            "count": len(form_list)
+        }, 200
+
+    except Exception as e:
+        print(f"[ADMIN] Error in get_admin_forms: {str(e)}")
+        return {
+            "message": f"Error: {str(e)}"
+        }, 500
+
+
+@app.route("/admin/forms/<form_id>", methods=["GET"])
+@token_required
+def get_admin_form(current_user, form_id):
+    """
+    Get complete form detail for admin editing (including inactive forms)
+    Allows admins to edit and view all form properties including theme, layout, branding
+    """
+    print(f"\n[ADMIN] GET /admin/forms/{form_id} called by {current_user}")
+
+    try:
+        form = Form.query.filter_by(id=form_id).first()
+
+        if not form:
+            print(f"[ADMIN] Form {form_id} not found")
+            return {
+                "status": "error",
+                "message": f"Form {form_id} not found"
+            }, 404
+
+        print(f"[ADMIN] Form {form_id} retrieved with {len(form.fields)} fields")
+
+        return {
+            "status": "success",
+            "form": form.to_dict_with_fields()
+        }, 200
+
+    except Exception as e:
+        print(f"[ADMIN] Error in get_admin_form: {str(e)}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
 
 
 @app.route("/forms/<form_id>", methods=["GET"])
@@ -795,6 +913,7 @@ def create_form(current_user):
         print(f"[ADMIN] Form {data['id']} created successfully by {current_user}")
         
         return {
+            "status": "success",
             "message": "Form created successfully",
             "form": new_form.to_dict()
         }, 201
@@ -802,14 +921,20 @@ def create_form(current_user):
     except Exception as e:
         db.session.rollback()
         print(f"[ADMIN] Error in create_form: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
+        return {"status": "error", "message": f"Error: {str(e)}"}, 500
 
 
 @app.route("/admin/forms/<form_id>", methods=["PUT"])
 @token_required
 def update_form(current_user, form_id):
     """
-    Update form metadata (ADMIN ONLY)
+    Update form metadata and UI configuration (ADMIN ONLY)
+    
+    Supported fields:
+    - name, description, version, is_active (metadata)
+    - theme: {} (UI theme configuration)
+    - layout: {} (Form layout configuration)
+    - branding: {} (Branding configuration)
     """
     print(f"\n[ADMIN] PUT /admin/forms/{form_id} called by {current_user}")
     
@@ -817,10 +942,11 @@ def update_form(current_user, form_id):
         form = Form.query.filter_by(id=form_id).first()
         
         if not form:
-            return {"message": f"Form {form_id} not found"}, 404
+            return {"status": "error", "message": f"Form {form_id} not found"}, 404
         
         data = request.get_json()
         
+        # Update basic metadata
         if "name" in data:
             form.name = data["name"]
         if "description" in data:
@@ -830,11 +956,20 @@ def update_form(current_user, form_id):
         if "is_active" in data:
             form.is_active = data["is_active"]
         
+        # Update UI configuration
+        if "theme" in data:
+            form.theme_json = json.dumps(data["theme"]) if isinstance(data["theme"], dict) else data["theme"]
+        if "layout" in data:
+            form.layout_json = json.dumps(data["layout"]) if isinstance(data["layout"], dict) else data["layout"]
+        if "branding" in data:
+            form.branding_json = json.dumps(data["branding"]) if isinstance(data["branding"], dict) else data["branding"]
+        
         db.session.commit()
         
         print(f"[ADMIN] Form {form_id} updated successfully by {current_user}")
         
         return {
+            "status": "success",
             "message": "Form updated successfully",
             "form": form.to_dict()
         }, 200
@@ -842,7 +977,7 @@ def update_form(current_user, form_id):
     except Exception as e:
         db.session.rollback()
         print(f"[ADMIN] Error in update_form: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
+        return {"status": "error", "message": f"Error: {str(e)}"}, 500
 
 
 @app.route("/admin/forms/<form_id>/fields", methods=["POST"])
@@ -869,13 +1004,13 @@ def add_field_to_form(current_user, form_id):
         form = Form.query.filter_by(id=form_id).first()
         
         if not form:
-            return {"message": f"Form {form_id} not found"}, 404
+            return {"status": "error", "message": f"Form {form_id} not found"}, 404
         
         data = request.get_json()
         
         required_fields = ["field_id", "name", "type"]
         if not all(field in data for field in required_fields):
-            return {"message": "Missing required fields: field_id, name, type"}, 400
+            return {"status": "error", "message": "Missing required fields: field_id, name, type"}, 400
         
         new_field = Field(
             form_id=form_id,
@@ -885,7 +1020,8 @@ def add_field_to_form(current_user, form_id):
             required=data.get("required", False),
             placeholder=data.get("placeholder"),
             field_order=data.get("field_order", 0),
-            help_text=data.get("help_text")
+            help_text=data.get("help_text"),
+            default_value=data.get("default_value")
         )
         
         # Handle dropdown options
@@ -899,6 +1035,7 @@ def add_field_to_form(current_user, form_id):
         print(f"[ADMIN] Field {data['field_id']} added to form {form_id} by {current_user}")
         
         return {
+            "status": "success",
             "message": "Field added successfully",
             "field": new_field.to_dict()
         }, 201
@@ -906,14 +1043,24 @@ def add_field_to_form(current_user, form_id):
     except Exception as e:
         db.session.rollback()
         print(f"[ADMIN] Error in add_field_to_form: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
+        return {"status": "error", "message": f"Error: {str(e)}"}, 500
 
 
 @app.route("/admin/forms/<form_id>/fields/<int:field_db_id>", methods=["PUT"])
 @token_required
 def update_field(current_user, form_id, field_db_id):
     """
-    Update a field in a form (ADMIN ONLY)
+    ✅ COMPREHENSIVE FIELD UPDATE ENDPOINT
+    
+    Updates ALL field properties. This single endpoint supports:
+    - Edit Field (name, type, required, placeholder, help_text)
+    - Reorder Fields (field_order)
+    - Dropdown Options (options)
+    - Validation (validation)
+    - Conditional Logic (visible_if, enabled_if)
+    - Default Values (default_value)
+    
+    No additional endpoints needed for builder features.
     """
     print(f"\n[ADMIN] PUT /admin/forms/{form_id}/fields/{field_db_id} called by {current_user}")
     
@@ -921,10 +1068,11 @@ def update_field(current_user, form_id, field_db_id):
         field = Field.query.filter_by(id=field_db_id, form_id=form_id).first()
         
         if not field:
-            return {"message": f"Field not found"}, 404
+            return {"status": "error", "message": "Field not found"}, 404
         
         data = request.get_json()
         
+        # ✅ Update basic field properties
         if "name" in data:
             field.name = data["name"]
         if "type" in data:
@@ -937,14 +1085,28 @@ def update_field(current_user, form_id, field_db_id):
             field.field_order = data["field_order"]
         if "help_text" in data:
             field.help_text = data["help_text"]
+        if "default_value" in data:
+            field.default_value = data["default_value"]
+        
+        # ✅ Update complex properties (JSON-serialized)
         if "options" in data:
             field.set_options(data["options"])
+        
+        if "validation" in data:
+            field.set_validation(data["validation"])
+        
+        if "visible_if" in data:
+            field.set_visible_if(data["visible_if"])
+        
+        if "enabled_if" in data:
+            field.set_enabled_if(data["enabled_if"])
         
         db.session.commit()
         
         print(f"[ADMIN] Field {field_db_id} updated successfully by {current_user}")
         
         return {
+            "status": "success",
             "message": "Field updated successfully",
             "field": field.to_dict()
         }, 200
@@ -952,7 +1114,8 @@ def update_field(current_user, form_id, field_db_id):
     except Exception as e:
         db.session.rollback()
         print(f"[ADMIN] Error in update_field: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
+        traceback.print_exc()
+        return {"status": "error", "message": f"Error: {str(e)}"}, 500
 
 
 @app.route("/admin/forms/<form_id>/fields/<int:field_db_id>", methods=["DELETE"])
@@ -967,19 +1130,19 @@ def delete_field(current_user, form_id, field_db_id):
         field = Field.query.filter_by(id=field_db_id, form_id=form_id).first()
         
         if not field:
-            return {"message": f"Field not found"}, 404
+            return {"status": "error", "message": "Field not found"}, 404
         
         db.session.delete(field)
         db.session.commit()
         
         print(f"[ADMIN] Field {field_db_id} deleted successfully by {current_user}")
         
-        return {"message": "Field deleted successfully"}, 200
+        return {"status": "success", "message": "Field deleted successfully"}, 200
     
     except Exception as e:
         db.session.rollback()
         print(f"[ADMIN] Error in delete_field: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
+        return {"status": "error", "message": f"Error: {str(e)}"}, 500
 
 
 @app.route("/admin/forms/<form_id>", methods=["DELETE"])
@@ -994,19 +1157,19 @@ def delete_form(current_user, form_id):
         form = Form.query.filter_by(id=form_id).first()
         
         if not form:
-            return {"message": f"Form {form_id} not found"}, 404
+            return {"status": "error", "message": f"Form {form_id} not found"}, 404
         
         db.session.delete(form)
         db.session.commit()
         
         print(f"[ADMIN] Form {form_id} deleted successfully by {current_user}")
         
-        return {"message": "Form deleted successfully"}, 200
+        return {"status": "success", "message": "Form deleted successfully"}, 200
     
     except Exception as e:
         db.session.rollback()
         print(f"[ADMIN] Error in delete_form: {str(e)}")
-        return {"message": f"Error: {str(e)}"}, 500
+        return {"status": "error", "message": f"Error: {str(e)}"}, 500
 
 
 # ============================================
