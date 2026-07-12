@@ -2,7 +2,7 @@ import {
   Dashboard,
   Description,
   Preview,
-  Settings,
+  Assignment,
 } from "@mui/icons-material";
 
 import {
@@ -33,9 +33,9 @@ const menuItems = [
     path: "/preview",
   },
   {
-    title: "Settings",
-    icon: <Settings />,
-    path: "/settings",
+    title: "Submissions",
+    icon: <Assignment />,
+    path: "/submissions",
   },
 ];
 

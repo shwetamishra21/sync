@@ -6,7 +6,17 @@ import {
   Typography,
 } from "@mui/material";
 
-export default function QuickActions() {
+interface Props {
+  onCreateForm: () => void;
+  onPreviewForm: () => void;
+  onViewSubmissions: () => void;
+}
+
+export default function QuickActions({
+  onCreateForm,
+  onPreviewForm,
+  onViewSubmissions,
+}: Props) {
   return (
     <Card
       elevation={0}
@@ -19,7 +29,7 @@ export default function QuickActions() {
 
         <Typography
           variant="h6"
-          mb={3}
+          sx={{ mb: 3 }}
         >
           Quick Actions
         </Typography>
@@ -29,6 +39,7 @@ export default function QuickActions() {
           <Button
             variant="contained"
             fullWidth
+            onClick={onCreateForm}
           >
             Create Form
           </Button>
@@ -36,6 +47,7 @@ export default function QuickActions() {
           <Button
             variant="outlined"
             fullWidth
+            onClick={onPreviewForm}
           >
             Preview Form
           </Button>
@@ -43,15 +55,9 @@ export default function QuickActions() {
           <Button
             variant="outlined"
             fullWidth
+            onClick={onViewSubmissions}
           >
-            Theme Editor
-          </Button>
-
-          <Button
-            variant="outlined"
-            fullWidth
-          >
-            Publish
+            View Submissions
           </Button>
 
         </Stack>

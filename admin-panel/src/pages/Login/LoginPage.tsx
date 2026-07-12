@@ -44,7 +44,7 @@ export default function LoginPage() {
 
       localStorage.setItem("token", response.token);
 
-      localStorage.setItem("username", response.username);
+      localStorage.setItem("username", response.email);
 
       navigate("/dashboard", {
         replace: true,

@@ -12,7 +12,7 @@ import DashboardPage from "../pages/Dashboard/DashboardPage";
 import FormsPage from "../pages/Forms/FormsPage";
 import FormBuilderPage from "../pages/FormBuilder/FormBuilderPage";
 import PreviewPage from "../pages/Preview/PreviewPage";
-import SettingsPage from "../pages/Settings/SettingsPage";
+import SubmissionsPage from "../pages/Submissions/SubmissionsPage";
 import LoginPage from "../pages/Login/LoginPage";
 
 import type { ReactNode } from "react";
@@ -96,8 +96,8 @@ export default function AppRouter() {
           />
 
           <Route
-            path="/settings"
-            element={<SettingsPage />}
+            path="/submissions"
+            element={<SubmissionsPage />}
           />
         </Route>
 

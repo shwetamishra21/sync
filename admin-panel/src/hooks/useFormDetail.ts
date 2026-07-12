@@ -22,6 +22,16 @@ export function useFormDetail(
     useState(false);
 
   const loadForm = useCallback(async () => {
+    // Skip fetching when no form is selected yet (e.g. Preview page
+    // before the user picks a form). Calling /forms/ or /admin/forms/
+    // with an empty id would otherwise hit a non-existent route.
+    if (!formId) {
+      setForm(null);
+      setError(false);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(false);

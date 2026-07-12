@@ -73,12 +73,14 @@ export default function FieldList({
             <ListItemText
               primary={field.name}
               secondary={field.type}
-              primaryTypographyProps={{
-                variant: "body2",
-                fontWeight: 500,
-              }}
-              secondaryTypographyProps={{
-                variant: "caption",
+              slotProps={{
+                primary: {
+                  variant: "body2",
+                  sx: { fontWeight: 500 },
+                },
+                secondary: {
+                  variant: "caption",
+                },
               }}
             />
 

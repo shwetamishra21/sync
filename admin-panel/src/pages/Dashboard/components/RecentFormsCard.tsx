@@ -1,21 +1,36 @@
 import {
   Card,
   CardContent,
+  Chip,
   Divider,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   Typography,
 } from "@mui/material";
+import type { FormSummary } from "../../../types/form";
 
-const forms = [
-  "Resident Registration",
-  "Land Survey",
-  "Citizen Census",
-  "Agriculture Form",
-];
+interface Props {
+  forms: FormSummary[];
+  onSelect: (formId: string) => void;
+}
 
-export default function RecentFormsCard() {
+const formatDate = (date: string) =>
+  new Date(date).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+export default function RecentFormsCard({ forms, onSelect }: Props) {
+  const recentForms = [...forms]
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() -
+        new Date(a.created_at).getTime()
+    )
+    .slice(0, 5);
+
   return (
     <Card
       elevation={0}
@@ -34,20 +49,45 @@ export default function RecentFormsCard() {
           Recent Forms
         </Typography>
 
-        <List>
-          {forms.map((form) => (
-            <div key={form}>
-              <ListItem disablePadding>
-                <ListItemText
-                  primary={form}
-                  secondary="Updated recently"
-                />
-              </ListItem>
+        {recentForms.length === 0 ? (
+          <Typography color="text.secondary">
+            No forms have been created yet.
+          </Typography>
+        ) : (
+          <List sx={{ p: 0 }}>
+            {recentForms.map((form, index) => (
+              <div key={form.id}>
+                <ListItemButton
+                  disableGutters
+                  onClick={() => onSelect(form.id)}
+                  sx={{
+                    px: 1,
+                    borderRadius: 2,
+                  }}
+                >
+                  <ListItemText
+                    primary={form.name}
+                    secondary={`${form.field_count} field${
+                      form.field_count === 1 ? "" : "s"
+                    } • Created ${formatDate(form.created_at)}`}
+                  />
 
-              <Divider />
-            </div>
-          ))}
-        </List>
+                  <Chip
+                    size="small"
+                    label={
+                      (form.is_active ?? true) ? "Active" : "Inactive"
+                    }
+                    color={
+                      (form.is_active ?? true) ? "success" : "default"
+                    }
+                  />
+                </ListItemButton>
+
+                {index !== recentForms.length - 1 && <Divider />}
+              </div>
+            ))}
+          </List>
+        )}
       </CardContent>
     </Card>
   );

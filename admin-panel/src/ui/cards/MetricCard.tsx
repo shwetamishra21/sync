@@ -24,14 +24,16 @@ export default function MetricCard({
     <AppCard>
 
       <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
       >
 
         <Typography
           color="text.secondary"
-          fontSize={14}
+          sx={{ fontSize: 14 }}
         >
           {title}
         </Typography>
@@ -45,18 +47,22 @@ export default function MetricCard({
       </Box>
 
       <Typography
-        mt={2}
         variant="h4"
-        fontWeight={700}
+        sx={{
+          mt: 2,
+          fontWeight: 700,
+        }}
       >
         {value}
       </Typography>
 
       {subtitle && (
         <Typography
-          mt={1}
           color="success.main"
-          fontSize={13}
+          sx={{
+            mt: 1,
+            fontSize: 13,
+          }}
         >
           {subtitle}
         </Typography>

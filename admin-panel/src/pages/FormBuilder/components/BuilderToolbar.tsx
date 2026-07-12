@@ -24,8 +24,10 @@ export default function BuilderToolbar({
       <CardContent>
         <Stack
           direction="row"
-          justifyContent="space-between"
-          alignItems="center"
+          sx={{
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
         >
           <Stack direction="row" spacing={2}>
             {onAddField && (
