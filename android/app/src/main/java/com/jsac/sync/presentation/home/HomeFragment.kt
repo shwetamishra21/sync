@@ -155,26 +155,20 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
      * Update UI based on sync status
      */
     private fun updateSyncUI(status: SyncStatusViewModel.SyncStatus) {
-        Log.d("HomeFragment", "📊 Updating sync UI")
 
         if (status.pendingFormCount > 0) {
             tvPendingCount.visibility = View.VISIBLE
-            tvPendingCount.text = "📋 ${status.pendingFormCount} pending form(s)"
+            tvPendingCount.text = "${status.pendingFormCount} Pending"
         } else {
             tvPendingCount.visibility = View.GONE
         }
 
         tvSyncStatus.text = status.message
 
-        if (status.isSyncing) {
-            progressBarSync.visibility = View.VISIBLE
-            btnManualSync.isEnabled = false
-            btnManualSync.alpha = 0.5f
-        } else {
-            progressBarSync.visibility = View.GONE
-            btnManualSync.isEnabled = true
-            btnManualSync.alpha = 1.0f
-        }
+        progressBarSync.visibility =
+            if (status.isSyncing) View.VISIBLE else View.GONE
+
+        btnManualSync.isEnabled = !status.isSyncing
     }
 
     override fun onResume() {

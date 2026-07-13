@@ -20,7 +20,7 @@ class SplashViewModel @Inject constructor(
             val loggedIn = !token.isNullOrEmpty()
 
             // Debug logging to track token state
-            Log.d("SplashViewModel", "🔍 Token check - Value: '${token ?: "NULL"}', isLoggedIn: $loggedIn")
+            Log.d("SplashViewModel", "Token state: ${!token.isNullOrEmpty()}")
 
             loggedIn
         }

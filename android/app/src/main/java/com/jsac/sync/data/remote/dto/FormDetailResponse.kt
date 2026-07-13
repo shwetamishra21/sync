@@ -12,7 +12,7 @@ data class FormDetail(
     val version: String,
     val created_at: String,
 
-    // NEW - Backend controlled UI configuration
+    // Backend controlled UI configuration
     val theme: ThemeConfig = ThemeConfig(),
     val layout: LayoutConfig = LayoutConfig(),
     val branding: BrandingConfig = BrandingConfig(),
@@ -21,21 +21,39 @@ data class FormDetail(
 )
 
 data class ThemeConfig(
+
     val primaryColor: String = "#1976D2",
+
     val secondaryColor: String = "#03A9F4",
+
     val backgroundColor: String = "#FFFFFF",
-    val cardColor: String = "#FFFFFF",
+
+    val surfaceColor: String = "#FFFFFF",
+
+    val buttonColor: String = "#1976D2",
+
+    val buttonTextColor: String = "#FFFFFF",
+
     val textColor: String = "#212121",
-    val buttonStyle: String = "filled",
-    val cornerRadius: Int = 12,
-    val typography: String = "default"
+
+    val cornerRadius: Int = 12
 )
 
 data class LayoutConfig(
+
     val columns: Int = 1,
+
     val spacing: Int = 16,
+
     val fieldStyle: String = "outlined",
-    val labelPosition: String = "top"
+
+    val labelPosition: String = "top",
+
+    val cardPadding: Int = 16,
+
+    val sectionSpacing: Int = 24,
+
+    val showDividers: Boolean = true
 )
 
 data class BrandingConfig(
@@ -63,7 +81,7 @@ data class VisibleIfConfig(
     val equals: String
 )
 
-// ✅ NEW: Enable/Disable configuration
+// Enable/Disable configuration
 data class EnabledIfConfig(
     val field: String,
     val equals: String
@@ -83,6 +101,6 @@ data class FormField(
 
     val enabled_if: EnabledIfConfig? = null,
 
-    // ✅ NEW: Backend-driven default value
+    // Backend-driven default value
     val default_value: String? = null
 )

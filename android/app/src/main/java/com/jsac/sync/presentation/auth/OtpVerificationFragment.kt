@@ -11,11 +11,6 @@ import androidx.navigation.fragment.findNavController
 import com.jsac.sync.R
 import dagger.hilt.android.AndroidEntryPoint
 
-/**
- * ✅ FIXED: OTP Verification Fragment
- * User receives OTP via email and verifies it here
- * After verification, navigates to Reset Password screen
- */
 @AndroidEntryPoint
 class OtpVerificationFragment :
     Fragment(R.layout.fragment_otp_verification) {
@@ -28,19 +23,18 @@ class OtpVerificationFragment :
     ) {
         super.onViewCreated(view, savedInstanceState)
 
-        val username =
-            requireArguments().getString("username") ?: ""
+        val username = requireArguments().getString("username") ?: ""
 
-        val etOtp =
-            view.findViewById<EditText>(R.id.etOtp)
+        val etOtp = view.findViewById<EditText>(R.id.etOtp)
 
-        val btnVerify =
-            view.findViewById<Button>(R.id.btnVerifyOtp)
+        val btnVerify = view.findViewById<Button>(R.id.btnVerifyOtp)
+
+        val btnResendOtp =
+            view.findViewById<Button>(R.id.btnResendOtp)
 
         btnVerify.setOnClickListener {
 
-            val otp =
-                etOtp.text.toString().trim()
+            val otp = etOtp.text.toString().trim()
 
             if (otp.isBlank()) {
 
@@ -67,10 +61,7 @@ class OtpVerificationFragment :
                     ).show()
 
                     val bundle = Bundle().apply {
-                        putString(
-                            "username",
-                            username
-                        )
+                        putString("username", username)
                     }
 
                     findNavController().navigate(
@@ -91,9 +82,20 @@ class OtpVerificationFragment :
                 }
 
             )
-
         }
 
-    }
+        // Optional resend button
+        btnResendOtp.setOnClickListener {
 
+            Toast.makeText(
+                requireContext(),
+                "A new OTP has been requested.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            // Replace this with your backend resend API when available
+            // viewModel.requestOtp(username)
+
+        }
+    }
 }

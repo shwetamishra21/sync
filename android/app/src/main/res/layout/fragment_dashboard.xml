@@ -1,101 +1,149 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:background="@color/background">
 
-    <!-- Title -->
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Available Forms"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="8dp"/>
+        android:padding="@dimen/space_lg"
+        android:orientation="vertical">
 
-    <!-- Subtitle -->
-    <TextView
-        android:layout_width="wrap_content"
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Workflow Forms"
+            style="@style/TitleText"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_xs"
+            android:text="Available forms assigned to your workspace."
+            style="@style/SubtitleText"/>
+
+    </LinearLayout>
+
+    <!-- Loading -->
+    <LinearLayout
+        android:id="@+id/loadingContainer"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Select a form to begin"
-        android:textSize="14sp"
-        android:textColor="@android:color/darker_gray"
-        android:layout_marginBottom="16dp"/>
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:paddingTop="@dimen/space_xl"
+        android:paddingBottom="@dimen/space_xl">
 
-    <!-- Loading Progress -->
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginTop="32dp"
-        android:visibility="gone"/>
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="40dp"
+            android:layout_height="40dp"/>
 
-    <!-- ============================================ -->
-    <!-- SWIPE REFRESH LAYOUT (Pull-to-Refresh) -->
-    <!-- ============================================ -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_md"
+            android:text="Loading forms..."
+            style="@style/BodyText"
+            android:textColor="@color/text_secondary"/>
 
+    </LinearLayout>
+
+    <!-- Forms -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- Forms List -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvForms"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="gone"/>
+            android:clipToPadding="false"
+            android:paddingBottom="@dimen/space_md"/>
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    <!-- Empty State -->
+    <!-- Empty -->
     <LinearLayout
         android:id="@+id/containerEmpty"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:gravity="center"
         android:orientation="vertical"
-        android:visibility="gone">
+        android:visibility="gone"
+        android:padding="@dimen/space_lg">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="📋"
-            android:textSize="48sp"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginHorizontal="@dimen/space_md"
+            app:cardCornerRadius="@dimen/corner_large"
+            app:cardElevation="@dimen/card_elevation"
+            app:strokeColor="@color/divider"
+            app:strokeWidth="1dp">
 
-        <TextView
-            android:id="@+id/tvEmpty"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="No forms available"
-            android:textSize="16sp"/>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="@dimen/space_lg">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No forms available"
+                    style="@style/SectionTitle"/>
+
+                <TextView
+                    android:id="@+id/tvEmpty"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_sm"
+                    android:text="Pull down to refresh"
+                    style="@style/SubtitleText"/>
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
     </LinearLayout>
 
-    <!-- Error State -->
+    <!-- Error -->
     <TextView
         android:id="@+id/tvError"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/space_md"
+        android:background="@drawable/bg_error_box"
         android:gravity="center"
-        android:textColor="@android:color/holo_red_dark"
+        android:padding="@dimen/space_md"
+        android:textColor="@color/error"
         android:visibility="gone"/>
 
-    <!-- ✅ FIXED: Added back to home button -->
-    <!-- This gives users a way to manually trigger sync from dashboard -->
-    <Button
-        android:id="@+id/btnBackToHome"
+    <!-- Bottom -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="🏠 Back to Home"
-        android:layout_marginTop="8dp"
-        android:backgroundTint="@color/sync_button_color"
-        android:visibility="visible"/>
+        android:padding="@dimen/space_md">
+
+        <Button
+            android:id="@+id/btnBackToHome"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/back_to_home"
+            android:textAllCaps="false"
+            android:background="@drawable/bg_secondary_button"/>
+
+    </LinearLayout>
 
 </LinearLayout>

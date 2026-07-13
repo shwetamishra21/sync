@@ -1,80 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- ============================================ -->
-    <!-- EXISTING APP COLORS -->
-    <!-- ============================================ -->
+    <!-- ====================================================== -->
+    <!-- Brand -->
+    <!-- ====================================================== -->
 
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
+    <color name="primary">#1565C0</color>
+    <color name="primary_dark">#0D47A1</color>
+    <color name="primary_light">#E3F2FD</color>
 
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <color name="secondary">#546E7A</color>
 
-    <!-- ============================================ -->
-    <!-- HOME / SYNC COLORS -->
-    <!-- ============================================ -->
+    <!-- ====================================================== -->
+    <!-- Background -->
+    <!-- ====================================================== -->
 
-    <color name="sync_status_background">#1E1E1E</color>
-    <color name="sync_success_color">#FF4CAF50</color>
-    <color name="sync_button_color">#FF2196F3</color>
-    <color name="logout_button_color">#FFF44336</color>
+    <color name="background">#FAFAFA</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="card_background">#FFFFFF</color>
 
-    <!-- ============================================ -->
-    <!-- SUBMISSION STATUS COLORS -->
-    <!-- ============================================ -->
+    <!-- ====================================================== -->
+    <!-- Text -->
+    <!-- ====================================================== -->
 
-    <color name="status_pending">#FFC107</color>
-    <color name="status_syncing">#2196F3</color>
-    <color name="status_synced">#4CAF50</color>
-    <color name="status_failed">#F44336</color>
+    <color name="text_primary">#1F2937</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_hint">#9CA3AF</color>
 
-    <!-- ============================================ -->
-    <!-- BACKGROUND COLORS -->
-    <!-- ============================================ -->
+    <color name="secondary_text">@color/text_secondary</color>
 
-    <color name="header_background">@color/purple_200</color>
-    <color name="card_background">#F5F5F5</color>
-    <color name="error_background">#FFEBEE</color>
-    <color name="success_background">#E8F5E9</color>
-    <color name="info_background">#E3F2FD</color>
+    <!-- Compatibility -->
+    <color name="text_error">@color/status_failed_fg</color>
 
-    <!-- ============================================ -->
-    <!-- TEXT COLORS -->
-    <!-- ============================================ -->
+    <!-- ====================================================== -->
+    <!-- Divider -->
+    <!-- ====================================================== -->
 
-    <color name="text_primary">#212121</color>
-    <color name="text_secondary">#757575</color>
-    <color name="text_error">#C62828</color>
-    <color name="text_success">#2E7D32</color>
+    <color name="divider">#E5E7EB</color>
 
-    <!-- ============================================ -->
-    <!-- BUTTON COLORS -->
-    <!-- ============================================ -->
+    <!-- ====================================================== -->
+    <!-- Semantic Colors -->
+    <!-- ====================================================== -->
 
-    <color name="btn_sync">#2196F3</color>
-    <color name="btn_delete">#F44336</color>
-    <color name="btn_back">#757575</color>
-    <color name="btn_disabled">#BDBDBD</color>
+    <color name="success">#2E7D32</color>
+    <color name="warning">#F9A825</color>
+    <color name="error">#C62828</color>
 
-    <!-- ============================================ -->
-    <!-- BADGE COLORS -->
-    <!-- ============================================ -->
+    <!-- ====================================================== -->
+    <!-- Status Colors -->
+    <!-- ====================================================== -->
 
-    <color name="badge_pending">#FFF3E0</color>
-    <color name="badge_syncing">#E3F2FD</color>
-    <color name="badge_synced">#E8F5E9</color>
-    <color name="badge_failed">#FFEBEE</color>
+    <color name="status_pending_bg">#FFF3CD</color>
+    <color name="status_pending_fg">#856404</color>
 
-    <!-- ============================================ -->
-    <!-- UTILITY COLORS -->
-    <!-- ============================================ -->
+    <color name="status_syncing_bg">#CCE5FF</color>
+    <color name="status_syncing_fg">#004085</color>
 
-    <color name="divider">#BDBDBD</color>
-    <color name="overlay">#80000000</color>
+    <color name="status_synced_bg">#D4EDDA</color>
+    <color name="status_synced_fg">#155724</color>
+
+    <color name="status_failed_bg">#F8D7DA</color>
+    <color name="status_failed_fg">#721C24</color>
+
+    <!-- ====================================================== -->
+    <!-- Compatibility Colors (Old XMLs) -->
+    <!-- ====================================================== -->
+
+    <color name="error_background">@color/status_failed_bg</color>
+    <color name="badge_pending">@color/status_pending_bg</color>
+
+    <!-- ====================================================== -->
+    <!-- JSAC Branding -->
+    <!-- ====================================================== -->
+
+    <color name="jsac_blue">#1565C0</color>
+    <color name="jsac_light">#EAF3FC</color>
+
+    <!-- ====================================================== -->
+    <!-- Utility -->
+    <!-- ====================================================== -->
+
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
     <color name="transparent">#00000000</color>
+
+    <color name="md_surface_variant">@color/surface</color>
+
+    <color name="md_on_surface_variant">@color/text_secondary</color>
+
+    <color name="md_primary">@color/primary</color>
+
 
 </resources>

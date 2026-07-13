@@ -1,15 +1,17 @@
 package com.jsac.sync.presentation.submissions
 
-import android.graphics.Color
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
+import android.widget.ImageButton
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
 import com.jsac.sync.R
 import com.jsac.sync.data.local.db.entity.FormSubmissionEntity
 import java.text.SimpleDateFormat
@@ -17,19 +19,11 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * ✅ VERIFIED: RecyclerView adapter for displaying form submissions
+ * RecyclerView adapter for displaying form submissions as Material cards.
  *
- * Changes:
- * 1. Added detailed logging for debugging
- * 2. Verified submitList() properly updates items
- * 3. Ensured DiffUtil is calculating differences correctly
- *
- * Shows:
- * - Form name
- * - Creation date
- * - Color-coded status badge (Pending, Syncing, Synced, Failed)
- * - Retry count (if any)
- * - Sync and Delete action buttons
+ * Status color/label logic lives entirely in SubmissionStatusUi so this
+ * adapter and SubmissionDetailFragment can never show a different color
+ * for the same status.
  */
 class SubmissionsAdapter(
     private val onSubmissionClick: (Int) -> Unit,
@@ -40,32 +34,18 @@ class SubmissionsAdapter(
 ) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SubmissionViewHolder {
-        Log.d("SubmissionsAdapter", "🔧 Creating new ViewHolder")
-
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_submission, parent, false)
 
-        return SubmissionViewHolder(
-            view,
-            onSubmissionClick,
-            onSyncClick,
-            onDeleteClick
-        )
+        return SubmissionViewHolder(view, onSubmissionClick, onSyncClick, onDeleteClick)
     }
 
     override fun onBindViewHolder(holder: SubmissionViewHolder, position: Int) {
-        Log.d("SubmissionsAdapter", "📌 Binding item at position: $position")
         holder.bind(getItem(position))
     }
 
-    /**
-     * ✅ OVERRIDE: Track list changes for debugging
-     */
     override fun submitList(list: List<FormSubmissionEntity>?) {
-        Log.d("SubmissionsAdapter", "📝 submitList called with ${list?.size ?: 0} items")
-        list?.forEachIndexed { idx, submission ->
-            Log.d("SubmissionsAdapter", "   [$idx] ID=${submission.id}, Form=${submission.form_id}, Status=${submission.sync_status}")
-        }
+        Log.d("SubmissionsAdapter", "submitList called with ${list?.size ?: 0} items")
         super.submitList(list)
     }
 
@@ -78,86 +58,72 @@ class SubmissionsAdapter(
 
         private val tvFormName: TextView = itemView.findViewById(R.id.tvFormName)
         private val tvDate: TextView = itemView.findViewById(R.id.tvDate)
-        private val tvStatus: TextView = itemView.findViewById(R.id.tvStatus)
+        private val chipStatus: Chip = itemView.findViewById(R.id.chipStatus)
         private val tvRetryCount: TextView = itemView.findViewById(R.id.tvRetryCount)
-        private val btnSync: Button = itemView.findViewById(R.id.btnSync)
-        private val btnDelete: Button = itemView.findViewById(R.id.btnDelete)
+        private val btnSync: MaterialButton = itemView.findViewById(R.id.btnSync)
+        private val btnDelete: ImageButton = itemView.findViewById(R.id.btnDelete)
+
+        private val dateFormat = SimpleDateFormat("MMM dd, yyyy · HH:mm", Locale.getDefault())
 
         fun bind(submission: FormSubmissionEntity) {
             val submissionId = submission.id
-
-            Log.d("SubmissionsAdapter", "🔗 Binding submission #$submissionId")
+            val context = itemView.context
 
             // ============================================
             // FORM NAME
             // ============================================
-
-            tvFormName.text = "📋 Form: ${submission.form_id}"
-
-            // ============================================
-            // DATE
-            // ============================================
-
-            val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-            val createdDate = dateFormat.format(Date(submission.created_at))
-            tvDate.text = "📅 $createdDate"
+            // FormSubmissionEntity only has form_id (not form_name)
+            tvFormName.text = submission.form_id
+            tvDate.text = dateFormat.format(Date(submission.created_at))
 
             // ============================================
-            // STATUS BADGE (COLOR-CODED)
+            // STATUS CHIP — single source of truth
             // ============================================
 
-            val (statusText, statusColor) = when (submission.sync_status) {
-                "PENDING" -> "⏳ Pending" to Color.parseColor("#FFC107")
-                "SYNCING" -> "🔄 Syncing" to Color.parseColor("#2196F3")
-                "SYNCED" -> "✅ Synced" to Color.parseColor("#4CAF50")
-                "FAILED" -> "❌ Failed" to Color.parseColor("#F44336")
-                else -> submission.sync_status to Color.GRAY
-            }
-
-            tvStatus.text = statusText
-            tvStatus.setTextColor(statusColor)
+            val statusInfo = SubmissionStatusUi.of(submission.sync_status)
+            chipStatus.text = statusInfo.label
+            chipStatus.chipBackgroundColor = ContextCompat.getColorStateList(
+                context, statusInfo.backgroundColorRes
+            )
+            chipStatus.setTextColor(ContextCompat.getColor(context, statusInfo.foregroundColorRes))
 
             // ============================================
-            // RETRY COUNT
+            // RETRY BADGE
             // ============================================
 
             if (submission.retry_count > 0) {
-                tvRetryCount.text = "🔁 Retries: ${submission.retry_count}"
+                tvRetryCount.text = "↻ ${submission.retry_count}"
                 tvRetryCount.visibility = View.VISIBLE
             } else {
                 tvRetryCount.visibility = View.GONE
             }
 
             // ============================================
-            // CLICK LISTENER (NAVIGATE TO DETAIL)
-            // ============================================
-
-            itemView.setOnClickListener {
-                Log.d("SubmissionsAdapter", "👆 Item clicked: $submissionId")
-                onSubmissionClick(submissionId)
-            }
-
-            // ============================================
             // SYNC BUTTON
             // ============================================
 
-            btnSync.setOnClickListener {
-                Log.d("SubmissionsAdapter", "🔄 Sync clicked for submission: $submissionId")
-                onSyncClick(submissionId)
+            val synced = SubmissionStatusUi.isSynced(submission.sync_status)
+            btnSync.isEnabled = !synced
+            btnSync.alpha = if (synced) 0.6f else 1f
+            btnSync.text = if (synced) {
+                context.getString(R.string.status_synced)
+            } else {
+                context.getString(R.string.btn_sync)
             }
 
-            // Disable if already synced
-            btnSync.isEnabled = submission.sync_status != "SYNCED"
-            btnSync.text = if (submission.sync_status == "SYNCED") "✅ Synced" else "🔄 Sync"
-
-            // ============================================
-            // DELETE BUTTON
-            // ============================================
-
-            btnDelete.setOnClickListener {
-                Log.d("SubmissionsAdapter", "🗑️ Delete clicked for submission: $submissionId")
-                onDeleteClick(submissionId)
+            btnSync.icon = if (synced) {
+                null
+            } else {
+                ContextCompat.getDrawable(context, R.drawable.ic_sync)
             }
+
+            // ============================================
+            // CLICK LISTENERS
+            // ============================================
+
+            itemView.setOnClickListener { onSubmissionClick(submissionId) }
+            btnSync.setOnClickListener { onSyncClick(submissionId) }
+            btnDelete.setOnClickListener { onDeleteClick(submissionId) }
         }
     }
 
@@ -165,24 +131,11 @@ class SubmissionsAdapter(
         override fun areItemsTheSame(
             oldItem: FormSubmissionEntity,
             newItem: FormSubmissionEntity
-        ): Boolean {
-            val same = oldItem.id == newItem.id
-            if (!same) {
-                Log.d("SubmissionsAdapter", "   Different items: ${oldItem.id} vs ${newItem.id}")
-            }
-            return same
-        }
+        ): Boolean = oldItem.id == newItem.id
 
         override fun areContentsTheSame(
             oldItem: FormSubmissionEntity,
             newItem: FormSubmissionEntity
-        ): Boolean {
-            val same = oldItem == newItem
-            if (!same) {
-                Log.d("SubmissionsAdapter", "   Content changed for item #${oldItem.id}")
-                Log.d("SubmissionsAdapter", "      Old status: ${oldItem.sync_status} → New status: ${newItem.sync_status}")
-            }
-            return same
-        }
+        ): Boolean = oldItem == newItem
     }
 }

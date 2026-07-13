@@ -3,7 +3,6 @@ package com.jsac.sync.presentation.dashboard.adapter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -20,7 +19,7 @@ class FormListAdapter(
         viewType: Int
     ): FormViewHolder {
         val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_form, parent, false)
+            .inflate(R.layout.item_dashboard_form, parent, false)
         return FormViewHolder(view, onFormClick)
     }
 
@@ -39,11 +38,14 @@ class FormListAdapter(
         private val tvName: TextView = itemView.findViewById(R.id.tvFormName)
         private val tvDescription: TextView = itemView.findViewById(R.id.tvFormDescription)
         private val tvFieldCount: TextView = itemView.findViewById(R.id.tvFieldCount)
-        private val container: LinearLayout = itemView.findViewById(R.id.itemContainer)
+        private val container: View = itemView.findViewById(R.id.itemContainer)
 
         fun bind(form: FormEntity) {
             tvName.text = form.name
-            tvDescription.text = form.description
+
+            tvDescription.text = form.description.takeIf { it.isNotBlank() }
+                ?: "Government workflow form"
+
             tvFieldCount.text = "${form.field_count} fields"
 
             container.setOnClickListener {

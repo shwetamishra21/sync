@@ -48,6 +48,7 @@ import com.jsac.sync.utils.LocationHelper
  * - Conditional visibility based on field values
  * - Dynamic enable/disable based on field values
  * - Backend-driven default values
+ * - Synchronized theme, layout, and branding from backend
  */
 @AndroidEntryPoint
 class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
@@ -68,7 +69,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
     private var currentForm: FormDetail? = null
     private val fieldContainers = mutableMapOf<String, View>()
 
-    // ✅ NEW: Map to store input widgets for enable/disable control
+    // ✅ Map to store input widgets for enable/disable control
     private val fieldInputs = mutableMapOf<String, View>()
 
     private var pendingGpsFieldId: String? = null
@@ -239,6 +240,54 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             }
         }
     }
+    private fun styleEditText(
+        editText: EditText,
+        field: FormField
+    ) {
+        editText.apply {
+
+            setTextColor(
+                Color.parseColor(
+                    currentForm?.theme?.textColor ?: "#212121"
+                )
+            )
+
+            setHintTextColor(
+                ContextCompat.getColor(
+                    requireContext(),
+                    R.color.text_hint
+                )
+            )
+
+            textSize = 16f
+
+            hint = field.placeholder ?: ""
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+
+            setPadding(
+                resources.getDimensionPixelSize(R.dimen.space_md),
+                resources.getDimensionPixelSize(R.dimen.space_md),
+                resources.getDimensionPixelSize(R.dimen.space_md),
+                resources.getDimensionPixelSize(R.dimen.space_md)
+            )
+
+            // Optional: Set background drawable if exists
+            try {
+                setBackgroundResource(R.drawable.bg_edittext)
+                background?.setTint(
+                    Color.parseColor(
+                        currentForm?.theme?.primaryColor ?: "#1976D2"
+                    )
+                )
+            } catch (e: Exception) {
+                // Use default if drawable doesn't exist
+            }
+        }
+    }
 
     private fun observeFormState() {
         viewLifecycleOwner.lifecycleScope.launch {
@@ -325,263 +374,164 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             createFormField(field)
         }
 
-        // ✅ Call refreshDynamicRules after rendering all fields
+        // Call refreshDynamicRules after rendering all fields
         refreshDynamicRules()
     }
 
     private fun createFormField(field: FormField) {
-        val fieldContainer = LinearLayout(requireContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                val spacing = currentForm?.layout?.spacing ?: 16
+        val fieldContainer = createFieldContainer()
 
-                setMargins(
-                    0,
-                    spacing,
-                    0,
-                    0
-                )
-            }
-            orientation = LinearLayout.VERTICAL
-        }
+        val label = createFieldLabel(field)
 
-        // Field label
-        val label = TextView(requireContext()).apply {
-            text = field.name + if (field.required) " *" else ""
-            textSize = 14f
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
         fieldContainer.addView(label)
 
         // Create appropriate input based on field type
         when (field.type) {
             "text", "number" -> {
-                var inputType = when (field.type) {
+
+                val inputType = when (field.type) {
                     "number" -> android.text.InputType.TYPE_CLASS_NUMBER
                     else -> android.text.InputType.TYPE_CLASS_TEXT
                 }
 
                 val editText = EditText(requireContext()).apply {
-                    hint = field.placeholder ?: "Enter ${field.name}"
+
                     setText(field.default_value ?: "")
-                    inputType = inputType
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
-                    setPadding(12, 12, 12, 12)
-                }
-                currentForm?.layout?.let { layout ->
 
-                    if (layout.fieldStyle == "filled") {
-
-                        editText.setBackgroundColor(
-                            Color.parseColor("#F5F5F5")
-                        )
-
-                    }
-
+                    this.inputType = inputType
                 }
 
-                // ✅ NEW: Propagate default value to the ViewModel
-                field.default_value?.let {
-                    viewModel.updateFieldValue(
-                        field.id,
-                        it
-                    )
-                }
+                styleEditText(
+                    editText,
+                    field
+                )
 
-                editText.setOnTextChangedListener { text ->
-                    viewModel.updateFieldValue(field.id, text.toString())
-                    refreshDynamicRules()
-                }
+                registerDefaultValue(field)
 
-                // ✅ Store input for enable/disable
-                fieldInputs[field.id] = editText
+                registerTextWatcher(
+                    field,
+                    editText
+                )
 
                 fieldContainer.addView(editText)
             }
 
             "email" -> {
+
                 val editText = EditText(requireContext()).apply {
-                    hint = field.placeholder ?: "Enter email"
+
+                    inputType =
+                        android.text.InputType.TYPE_CLASS_TEXT or
+                                android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+
                     setText(field.default_value ?: "")
-                    inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
-                    setPadding(12, 12, 12, 12)
-                }
-                currentForm?.layout?.let { layout ->
-
-                    if (layout.fieldStyle == "filled") {
-
-                        editText.setBackgroundColor(
-                            Color.parseColor("#F5F5F5")
-                        )
-
-                    }
-
                 }
 
-                // ✅ NEW: Propagate default value to the ViewModel
-                field.default_value?.let {
-                    viewModel.updateFieldValue(
-                        field.id,
-                        it
-                    )
-                }
+                styleEditText(
+                    editText,
+                    field
+                )
 
-                editText.setOnTextChangedListener { text ->
-                    viewModel.updateFieldValue(field.id, text.toString())
-                    refreshDynamicRules()
-                }
+                editText.hint =
+                    field.placeholder ?: "Enter email address"
 
-                // ✅ Store input for enable/disable
-                fieldInputs[field.id] = editText
+                registerDefaultValue(field)
+
+                registerTextWatcher(
+                    field,
+                    editText
+                )
 
                 fieldContainer.addView(editText)
             }
 
             "textarea" -> {
+
                 val editText = EditText(requireContext()).apply {
-                    hint = field.placeholder ?: "Enter ${field.name}"
-                    setText(field.default_value ?: "")
-                    inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                            android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+
+                    inputType =
+                        android.text.InputType.TYPE_CLASS_TEXT or
+                                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+
                     minLines = 4
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
-                    setPadding(12, 12, 12, 12)
-                }
-                currentForm?.layout?.let { layout ->
 
-                    if (layout.fieldStyle == "filled") {
+                    maxLines = 8
 
-                        editText.setBackgroundColor(
-                            Color.parseColor("#F5F5F5")
-                        )
+                    gravity = android.view.Gravity.TOP
 
-                    }
-
+                    setText(field.default_value ?: "")
                 }
 
-                // ✅ NEW: Propagate default value to the ViewModel
-                field.default_value?.let {
-                    viewModel.updateFieldValue(
-                        field.id,
-                        it
-                    )
-                }
+                styleEditText(
+                    editText,
+                    field
+                )
 
-                editText.setOnTextChangedListener { text ->
-                    viewModel.updateFieldValue(field.id, text.toString())
-                    refreshDynamicRules()
-                }
+                registerDefaultValue(field)
 
-                // ✅ Store input for enable/disable
-                fieldInputs[field.id] = editText
+                registerTextWatcher(
+                    field,
+                    editText
+                )
 
                 fieldContainer.addView(editText)
             }
 
             "dropdown" -> {
+
                 val spinner = Spinner(requireContext()).apply {
+
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     )
-                }
 
-                if (!field.options.isNullOrEmpty()) {
-                    val adapter = android.widget.ArrayAdapter(
-                        requireContext(),
-                        android.R.layout.simple_spinner_item,
-                        field.options
+                    minimumHeight = 140
+
+                    setPadding(
+                        resources.getDimensionPixelSize(R.dimen.space_md),
+                        resources.getDimensionPixelSize(R.dimen.space_sm),
+                        resources.getDimensionPixelSize(R.dimen.space_md),
+                        resources.getDimensionPixelSize(R.dimen.space_sm)
                     )
-                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                    spinner.adapter = adapter
-
-                    // ✅ NEW: Apply default value selection + propagate to ViewModel
-                    field.default_value?.let { defaultValue ->
-
-                        val index =
-                            field.options.indexOf(defaultValue)
-
-                        if (index >= 0) {
-
-                            spinner.setSelection(index)
-
-                            viewModel.updateFieldValue(
-                                field.id,
-                                defaultValue
-                            )
-                        }
-                    }
-
-                    spinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-                        override fun onItemSelected(parent: android.widget.AdapterView<*>, view: View?, position: Int, id: Long) {
-                            val selected = field.options[position]
-                            viewModel.updateFieldValue(field.id, selected)
-                            refreshDynamicRules()
-                        }
-
-                        override fun onNothingSelected(parent: android.widget.AdapterView<*>) {}
-                    }
                 }
 
-                // ✅ Store input for enable/disable
-                fieldInputs[field.id] = spinner
+                registerSpinner(
+                    field,
+                    spinner
+                )
 
                 fieldContainer.addView(spinner)
             }
 
             "date" -> {
+
                 val editText = EditText(requireContext()).apply {
-                    hint = "YYYY-MM-DD"
+
+                    inputType =
+                        android.text.InputType.TYPE_CLASS_DATETIME
+
+                    isFocusable = true
+
+                    isClickable = true
+
                     setText(field.default_value ?: "")
-                    inputType = android.text.InputType.TYPE_CLASS_DATETIME
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
-                    setPadding(12, 12, 12, 12)
-                }
-                currentForm?.layout?.let { layout ->
-
-                    if (layout.fieldStyle == "filled") {
-
-                        editText.setBackgroundColor(
-                            Color.parseColor("#F5F5F5")
-                        )
-
-                    }
-
                 }
 
-                // ✅ NEW: Propagate default value to the ViewModel
-                field.default_value?.let {
-                    viewModel.updateFieldValue(
-                        field.id,
-                        it
-                    )
-                }
+                styleEditText(
+                    editText,
+                    field
+                )
 
-                editText.setOnTextChangedListener { text ->
-                    viewModel.updateFieldValue(field.id, text.toString())
-                    refreshDynamicRules()
-                }
+                editText.hint =
+                    field.placeholder ?: "YYYY-MM-DD"
 
-                // ✅ Store input for enable/disable
-                fieldInputs[field.id] = editText
+                registerDefaultValue(field)
+
+                registerTextWatcher(
+                    field,
+                    editText
+                )
 
                 fieldContainer.addView(editText)
             }
@@ -589,12 +539,10 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             "media" -> {
 
                 val button = Button(requireContext()).apply {
+
                     text = "Select Photo"
 
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
+                    styleActionButton(this)
                 }
 
                 button.setOnClickListener {
@@ -623,7 +571,8 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                                         ) == PackageManager.PERMISSION_GRANTED
                                     ) {
 
-                                        val imageFile = createImageFile()
+                                        val imageFile =
+                                            createImageFile()
 
                                         capturedPhotoUri =
                                             FileProvider.getUriForFile(
@@ -632,7 +581,9 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                                                 imageFile
                                             )
 
-                                        cameraLauncher.launch(capturedPhotoUri)
+                                        cameraLauncher.launch(
+                                            capturedPhotoUri
+                                        )
 
                                     } else {
 
@@ -643,14 +594,16 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                                 }
 
                                 1 -> {
-                                    mediaPickerLauncher.launch("image/*")
+
+                                    mediaPickerLauncher.launch(
+                                        "image/*"
+                                    )
                                 }
                             }
                         }
                         .show()
                 }
 
-                // ✅ Store input for enable/disable
                 fieldInputs[field.id] = button
 
                 fieldContainer.addView(button)
@@ -659,12 +612,10 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             "gps" -> {
 
                 val button = Button(requireContext()).apply {
+
                     text = "Capture Location"
 
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
+                    styleActionButton(this)
                 }
 
                 button.setOnClickListener {
@@ -673,7 +624,8 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                         ContextCompat.checkSelfPermission(
                             requireContext(),
                             Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
+                        ) ==
+                        PackageManager.PERMISSION_GRANTED
                     ) {
 
                         captureLocation(field.id)
@@ -688,7 +640,6 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
                     }
                 }
 
-                // ✅ Store input for enable/disable
                 fieldInputs[field.id] = button
 
                 fieldContainer.addView(button)
@@ -719,6 +670,214 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             imageDir,
             "IMG_${timeStamp}.jpg"
         )
+    }
+    private fun createFieldContainer(): LinearLayout {
+        return LinearLayout(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                val layout = currentForm?.layout
+
+                setMargins(
+                    0,
+                    layout?.sectionSpacing ?: 24,
+                    0,
+                    layout?.spacing ?: 16
+                )
+            }
+
+            orientation = LinearLayout.VERTICAL
+        }
+    }
+
+    private fun createFieldLabel(
+        field: FormField
+    ): TextView {
+
+        return TextView(requireContext()).apply {
+
+            text =
+                if (field.required)
+                    "${field.name} *"
+                else
+                    field.name
+
+            textSize = 15f
+
+            setTypeface(
+                typeface,
+                android.graphics.Typeface.BOLD
+            )
+
+            setTextColor(
+                Color.parseColor(
+                    currentForm?.theme?.textColor ?: "#212121"
+                )
+            )
+
+            layoutParams =
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+
+                    bottomMargin =
+                        currentForm?.layout?.spacing
+                            ?: 16
+                }
+        }
+    }
+
+    private fun styleActionButton(
+        button: Button
+    ) {
+
+        button.layoutParams =
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+
+        button.minimumHeight =
+            resources.getDimensionPixelSize(
+                R.dimen.button_height
+            )
+
+        button.isAllCaps = false
+
+        button.setPadding(
+            resources.getDimensionPixelSize(R.dimen.space_md),
+            resources.getDimensionPixelSize(R.dimen.space_md),
+            resources.getDimensionPixelSize(R.dimen.space_md),
+            resources.getDimensionPixelSize(R.dimen.space_md)
+        )
+
+        button.setBackgroundColor(
+            Color.parseColor(
+                currentForm?.theme?.buttonColor ?: "#1976D2"
+            )
+        )
+
+        button.setTextColor(
+            Color.parseColor(
+                currentForm?.theme?.buttonTextColor ?: "#FFFFFF"
+            )
+        )
+    }
+
+    private fun registerDefaultValue(
+        field: FormField
+    ) {
+        field.default_value?.let {
+            viewModel.updateFieldValue(
+                field.id,
+                it
+            )
+        }
+    }
+
+    private fun registerTextWatcher(
+        field: FormField,
+        editText: EditText
+    ) {
+
+        editText.setOnTextChangedListener {
+
+            viewModel.updateFieldValue(
+                field.id,
+                it
+            )
+
+            refreshDynamicRules()
+        }
+
+        fieldInputs[field.id] = editText
+    }
+
+    private fun registerSpinner(
+        field: FormField,
+        spinner: Spinner
+    ) {
+
+        if (field.options.isNullOrEmpty()) return
+
+        val adapter = android.widget.ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_spinner_item,
+            field.options
+        ).apply {
+            setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item
+            )
+        }
+
+        spinner.adapter = adapter
+
+        field.default_value?.let { defaultValue ->
+
+            val index = field.options.indexOf(defaultValue)
+
+            if (index >= 0) {
+
+                spinner.setSelection(index)
+
+                viewModel.updateFieldValue(
+                    field.id,
+                    defaultValue
+                )
+            }
+        }
+
+        spinner.onItemSelectedListener =
+            object : android.widget.AdapterView.OnItemSelectedListener {
+
+                override fun onItemSelected(
+                    parent: android.widget.AdapterView<*>,
+                    view: View?,
+                    position: Int,
+                    id: Long
+                ) {
+
+                    viewModel.updateFieldValue(
+                        field.id,
+                        field.options[position]
+                    )
+
+                    refreshDynamicRules()
+                }
+
+                override fun onNothingSelected(parent: android.widget.AdapterView<*>) {}
+            }
+
+        fieldInputs[field.id] = spinner
+    }
+    private fun showToast(message: String) {
+        Toast.makeText(
+            requireContext(),
+            message,
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    private fun showLongToast(message: String) {
+        Toast.makeText(
+            requireContext(),
+            message,
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    private fun updateField(
+        fieldId: String,
+        value: String
+    ) {
+        viewModel.updateFieldValue(
+            fieldId,
+            value
+        )
+
+        refreshDynamicRules()
     }
 
     private fun captureLocation(fieldId: String) {
@@ -786,76 +945,53 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
             tvFormTitle.setTextColor(
                 Color.parseColor(theme.textColor)
             )
-            when(theme.typography){
-
-                "large" -> {
-
-                    tvFormTitle.textSize = 24f
-
-                }
-
-                "small" -> {
-
-                    tvFormTitle.textSize = 16f
-
-                }
-
-                else -> {
-
-                    tvFormTitle.textSize = 20f
-
-                }
-
-            }
 
             tvFormDescription.setTextColor(
                 Color.parseColor(theme.textColor)
             )
 
             btnSubmit.setBackgroundColor(
-                Color.parseColor(theme.primaryColor)
+                Color.parseColor(theme.buttonColor)
             )
-            when(theme.buttonStyle){
 
-                "filled" -> {
-
-                    btnSubmit.elevation = 8f
-
-                }
-
-                "flat" -> {
-
-                    btnSubmit.elevation = 0f
-
-                }
-
-            }
-
+            btnSubmit.setTextColor(
+                Color.parseColor(theme.buttonTextColor)
+            )
 
             requireView().setBackgroundColor(
                 Color.parseColor(theme.backgroundColor)
             )
 
-
         } catch (e: Exception) {
 
             Log.e(
                 "Theme",
-                "Invalid color ${e.message}"
+                "Theme parse error: ${e.message}"
             )
+
         }
     }
 
     private fun applyLayout(layout: LayoutConfig) {
 
-        val spacing = layout.spacing
+        containerForm.orientation =
+            if (layout.columns == 1)
+                LinearLayout.VERTICAL
+            else
+                LinearLayout.HORIZONTAL
 
         containerForm.setPadding(
-            spacing,
-            spacing,
-            spacing,
-            spacing
+
+            layout.cardPadding,
+
+            layout.cardPadding,
+
+            layout.cardPadding,
+
+            layout.cardPadding
+
         )
+
     }
 
     private fun applyBranding(
@@ -863,15 +999,35 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
     ) {
 
         tvFormTitle.text =
-            if (branding.organizationName.isNotBlank()) {
+
+            if (branding.organizationName.isNotBlank())
+
                 branding.organizationName
-            } else {
+
+            else
+
                 currentForm?.name ?: formName
-            }
+
+
+        when (branding.titleAlignment) {
+
+            "left" ->
+                tvFormTitle.textAlignment =
+                    View.TEXT_ALIGNMENT_VIEW_START
+
+            "right" ->
+                tvFormTitle.textAlignment =
+                    View.TEXT_ALIGNMENT_VIEW_END
+
+            else ->
+                tvFormTitle.textAlignment =
+                    View.TEXT_ALIGNMENT_CENTER
+
+        }
 
     }
 
-    // ✅ NEW: Update conditional visibility and enabled state together
+    // Update conditional visibility and enabled state together
     private fun refreshDynamicRules() {
         updateConditionalVisibility()
         updateConditionalEnabledState()
@@ -904,7 +1060,7 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
         }
     }
 
-    // ✅ NEW: Update enabled/disabled state based on enabled_if rules
+    // Update enabled/disabled state based on enabled_if rules
     private fun updateConditionalEnabledState() {
 
         val form = currentForm ?: return
@@ -942,14 +1098,20 @@ class FormDetailFragment : Fragment(R.layout.fragment_form_detail) {
     }
 
     private fun hideLoading() {
-        progressBar.visibility = View.GONE
+
+        view?.findViewById<View>(
+            R.id.loadingContainer
+        )?.visibility = View.GONE
+
         containerForm.visibility = View.VISIBLE
+
         btnSubmit.visibility = View.VISIBLE
     }
 
     private fun showError(message: String) {
         tvError.visibility = View.VISIBLE
-        tvError.text = "❌ Error: $message"
+        tvError.text =
+            "Unable to load the form.\n\n$message"
         containerForm.visibility = View.GONE
         btnSubmit.visibility = View.GONE
     }

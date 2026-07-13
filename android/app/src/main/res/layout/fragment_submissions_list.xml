@@ -1,103 +1,147 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="0dp">
+    android:background="@color/background">
 
     <!-- ============================================ -->
-    <!-- HEADER -->
+    <!-- TOOLBAR + FILTER HEADER -->
     <!-- ============================================ -->
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@color/purple_200">
+        android:background="@color/primary"
+        android:elevation="2dp"
+        android:paddingBottom="@dimen/space_sm">
 
-        <!-- Title -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@color/primary"
+            android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
+            app:title="@string/title_saved_submissions"
+            app:navigationIcon="@drawable/ic_arrow_back"/>
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="📋 Saved Submissions"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginStart="@dimen/space_md"
+            android:layout_marginTop="@dimen/space_xs"
+            android:text="@string/subtitle_submissions"
+            android:textAppearance="@style/TextAppearance.Sync.BodySmall"/>
 
-        <!-- Subtitle -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="View and sync your form submissions (Last 15)"
-            android:textSize="14sp"
-            android:textColor="@android:color/darker_gray"
-            android:layout_marginBottom="16dp"/>
-
-        <!-- ============================================ -->
-        <!-- FILTER SPINNER -->
-        <!-- ============================================ -->
-
-        <LinearLayout
+        <!-- Filter chips -->
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupFilter"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
+            android:layout_marginStart="@dimen/space_md"
+            android:layout_marginEnd="@dimen/space_md"
+            android:layout_marginTop="@dimen/space_sm"
+            app:singleSelection="true"
+            app:selectionRequired="true"
+            app:chipSpacingHorizontal="@dimen/space_sm">
 
-            <TextView
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipAll"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Filter:"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:layout_marginEnd="8dp"/>
+                android:checked="true"
+                android:text="@string/filter_all"
+                android:textColor="@color/white"
+                app:chipBackgroundColor="@color/primary"/>
 
-            <Spinner
-                android:id="@+id/spinnerFilter"
-                android:layout_width="0dp"
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipPending"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"/>
-        </LinearLayout>
+                android:text="@string/filter_pending"
+                android:textColor="@color/white"
+                app:chipBackgroundColor="@color/primary"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipSyncing"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/filter_syncing"
+                android:textColor="@color/white"
+                app:chipBackgroundColor="@color/primary"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipSynced"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/filter_synced"
+                android:textColor="@color/white"
+                app:chipBackgroundColor="@color/primary"/>
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipFailed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/filter_failed"
+                android:textColor="@color/white"
+                app:chipBackgroundColor="@color/primary"/>
+
+        </com.google.android.material.chip.ChipGroup>
 
     </LinearLayout>
 
     <!-- ============================================ -->
-    <!-- LOADING PROGRESS -->
+    <!-- LOADING -->
     <!-- ============================================ -->
 
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/loadingContainer"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginTop="32dp"
-        android:visibility="gone"/>
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:paddingTop="48dp">
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:indeterminateTint="@color/primary"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_md"
+            android:text="Loading submissions..."
+            android:textAppearance="@style/TextAppearance.Sync.BodySmall"/>
+
+    </LinearLayout>
 
     <!-- ============================================ -->
-    <!-- SWIPE REFRESH LAYOUT -->
-    <!-- ✅ FIXED: SwipeRefreshLayout takes remaining space -->
+    <!-- LIST -->
     <!-- ============================================ -->
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:visibility="visible">
+        android:layout_weight="1">
 
-        <!-- ============================================ -->
-        <!-- RECYCLER VIEW - KEY FIX HERE -->
-        <!-- ✅ FIXED: height="match_parent" allows RecyclerView -->
-        <!-- to expand and show all items properly -->
-        <!-- ============================================ -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvSubmissions"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingTop="@dimen/space_sm"
+            android:paddingBottom="@dimen/space_md"
             android:visibility="gone"
-            android:scrollbars="vertical"/>
+            android:scrollbars="vertical"
+            tools:listitem="@layout/item_submission" />
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
@@ -112,26 +156,29 @@
         android:layout_weight="1"
         android:gravity="center"
         android:orientation="vertical"
-        android:visibility="gone">
+        android:visibility="gone"
+        android:paddingHorizontal="@dimen/space_md">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="📭"
-            android:textSize="48sp"
-            android:layout_marginBottom="16dp"/>
+        <ImageView
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:src="@drawable/ic_inbox_empty"
+            android:importantForAccessibility="no"/>
 
         <TextView
             android:id="@+id/tvEmpty"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="No saved submissions"
-            android:textSize="16sp"
-            android:textColor="@android:color/darker_gray"/>
+            android:layout_marginTop="@dimen/space_md"
+            android:gravity="center"
+            android:text="@string/msg_no_submissions"
+            android:textColor="@color/secondary_text"
+            android:textAppearance="@style/TextAppearance.Sync.Body"/>
+
     </LinearLayout>
 
     <!-- ============================================ -->
-    <!-- ACTION BUTTONS -->
+    <!-- BOTTOM ACTIONS -->
     <!-- ============================================ -->
 
     <LinearLayout
@@ -139,32 +186,28 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:padding="16dp"
-        android:background="@color/white"
-        android:elevation="8dp">
+        android:padding="@dimen/space_md"
+        android:background="@color/primary"
+        android:elevation="4dp">
 
-        <!-- Sync All Pending Button -->
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSyncAll"
+            style="@style/Widget.Sync.Button.Filled"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="🔄 Sync All Pending"
-            android:textAllCaps="false"
-            android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/sync_button_color"
-            android:textColor="@android:color/white"/>
+            android:layout_marginEnd="@dimen/space_sm"
+            android:text="@string/btn_sync_all_pending"
+            app:icon="@drawable/ic_sync"
+            app:iconGravity="textStart"/>
 
-        <!-- View Forms Button -->
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnViewForms"
+            style="@style/Widget.Sync.Button.Outlined"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="📋 View Forms"
-            android:textAllCaps="false"
-            android:backgroundTint="@color/purple_500"
-            android:textColor="@android:color/white"/>
+            android:text="@string/btn_view_forms"/>
 
     </LinearLayout>
 

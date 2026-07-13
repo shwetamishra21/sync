@@ -1,69 +1,133 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:background="@color/background">
 
-    <!-- Form Title -->
-    <TextView
-        android:id="@+id/tvFormTitle"
-        android:layout_width="wrap_content"
+    <!-- ========================= -->
+    <!-- Header Card -->
+    <!-- ========================= -->
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Form Title"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="8dp"/>
+        android:layout_margin="@dimen/space_md"
+        app:cardCornerRadius="@dimen/corner_large"
+        app:cardElevation="@dimen/card_elevation"
+        app:strokeColor="@color/divider"
+        app:strokeWidth="1dp">
 
-    <!-- Form Description -->
-    <TextView
-        android:id="@+id/tvFormDescription"
-        android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/space_lg">
+
+            <TextView
+                android:id="@+id/tvFormTitle"
+                style="@style/TitleText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Form Title" />
+
+            <TextView
+                android:id="@+id/tvFormDescription"
+                style="@style/SubtitleText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_sm"
+                android:text="Form description" />
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- ========================= -->
+    <!-- Loading -->
+    <!-- ========================= -->
+
+    <LinearLayout
+        android:id="@+id/loadingContainer"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Form description"
-        android:textSize="14sp"
-        android:textColor="@android:color/darker_gray"
-        android:layout_marginBottom="16dp"/>
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="@dimen/space_xl"
+        android:visibility="gone">
 
-    <!-- Loading Progress -->
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginTop="32dp"
-        android:visibility="gone"/>
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="40dp"
+            android:layout_height="40dp" />
 
-    <!-- Error Message -->
+        <TextView
+            style="@style/SubtitleText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_md"
+            android:text="Loading form..." />
+
+    </LinearLayout>
+
+    <!-- ========================= -->
+    <!-- Error -->
+    <!-- ========================= -->
+
     <TextView
         android:id="@+id/tvError"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Error"
-        android:textColor="@android:color/holo_red_dark"
-        android:visibility="gone"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginHorizontal="@dimen/space_md"
+        android:layout_marginBottom="@dimen/space_md"
+        android:padding="@dimen/space_md"
+        android:background="@drawable/bg_error_box"
+        android:textColor="@color/error"
+        android:visibility="gone" />
 
-    <!-- Form Fields Container (populated dynamically) -->
+    <!-- ========================= -->
+    <!-- Dynamic Fields -->
+    <!-- ========================= -->
+
     <ScrollView
+        android:id="@+id/formScrollView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:fillViewport="true">
 
         <LinearLayout
             android:id="@+id/containerForm"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"/>
+            android:orientation="vertical"
+            android:paddingStart="@dimen/space_md"
+            android:paddingEnd="@dimen/space_md"
+            android:paddingBottom="@dimen/space_lg" />
+
     </ScrollView>
 
-    <!-- Submit Button -->
-    <Button
-        android:id="@+id/btnSubmit"
+    <!-- ========================= -->
+    <!-- Submit Section -->
+    <!-- ========================= -->
+
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Submit Form"
-        android:layout_marginTop="16dp"/>
+        android:background="@color/surface"
+        android:padding="@dimen/space_md">
+
+        <Button
+            android:id="@+id/btnSubmit"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@drawable/bg_primary_button"
+            android:text="@string/submit_form"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white" />
+
+    </LinearLayout>
 
 </LinearLayout>

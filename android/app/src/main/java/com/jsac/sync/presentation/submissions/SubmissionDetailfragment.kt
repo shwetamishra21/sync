@@ -1,19 +1,19 @@
 package com.jsac.sync.presentation.submissions
 
-import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
 import com.google.gson.Gson
 import com.jsac.sync.R
 import com.jsac.sync.data.local.db.entity.FormSubmissionEntity
@@ -21,24 +21,19 @@ import com.jsac.sync.data.repository.FormSubmissionRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * ✅ ENHANCED Fragment to display detailed view of a single submission
  *
- * NEW FEATURES:
- * 1. Displays media files attached to submission
- * 2. Better error handling and user feedback
- * 3. Shows form name (not just ID)
- * 4. Improved timestamp formatting
- * 5. Better status indicators with colors
- *
- * Shows:
- * - Form name and metadata
- * - All form field values
- * - Attached media files (photos, documents)
- * - Submission status with color coding
- * - Sync history and error messages
- * - Action buttons (sync, delete, back)
+ * Features:
+ * - Consistent status display using SubmissionStatusUi (shared with list screen)
+ * - Clean metadata presentation without emoji prefixes
+ * - Design-system-compliant form data rendering
+ * - Better loading and error states
+ * - Improved sync button feedback
  */
 @AndroidEntryPoint
 class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
@@ -50,34 +45,33 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
     private var submission: FormSubmissionEntity? = null
 
     // UI Components
+    private lateinit var toolbar: MaterialToolbar
+    private lateinit var loadingContainer: LinearLayout
     private lateinit var scrollView: ScrollView
-    private lateinit var progressBar: ProgressBar
     private lateinit var tvFormName: TextView
     private lateinit var tvFormId: TextView
     private lateinit var tvCreatedAt: TextView
-    private lateinit var tvSyncStatus: TextView
+    private lateinit var chipStatus: Chip
     private lateinit var tvSyncedAt: TextView
     private lateinit var tvRetryCount: TextView
     private lateinit var tvErrorMessage: TextView
     private lateinit var containerFormData: LinearLayout
-    private lateinit var btnSync: Button
-    private lateinit var btnDelete: Button
-    private lateinit var btnBack: Button
+    private lateinit var btnSync: MaterialButton
+    private lateinit var btnDelete: MaterialButton
 
-    override fun onViewCreated(
-        view: View,
-        savedInstanceState: Bundle?
-    ) {
+    private val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        Log.d("SubmissionDetailFragment", "🎬 Fragment created")
+        Log.d("SubmissionDetailFragment", "Fragment created")
 
         // Get submission ID from arguments
         submissionId = arguments?.getInt("submissionId") ?: 0
 
         if (submissionId == 0) {
-            Log.e("SubmissionDetailFragment", "❌ No submission ID provided")
-            showError("Invalid submission ID", null)
+            Log.e("SubmissionDetailFragment", "No submission ID provided")
+            showError("Invalid submission ID")
             return
         }
 
@@ -85,47 +79,40 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
         // BIND VIEWS
         // ============================================
 
+        toolbar = view.findViewById(R.id.toolbar)
+        loadingContainer = view.findViewById(R.id.loadingContainer)
         scrollView = view.findViewById(R.id.scrollView)
-        progressBar = view.findViewById(R.id.progressBar)
         tvFormName = view.findViewById(R.id.tvFormName)
         tvFormId = view.findViewById(R.id.tvFormId)
         tvCreatedAt = view.findViewById(R.id.tvCreatedAt)
-        tvSyncStatus = view.findViewById(R.id.tvSyncStatus)
+        chipStatus = view.findViewById(R.id.chipStatus)
         tvSyncedAt = view.findViewById(R.id.tvSyncedAt)
         tvRetryCount = view.findViewById(R.id.tvRetryCount)
         tvErrorMessage = view.findViewById(R.id.tvErrorMessage)
         containerFormData = view.findViewById(R.id.containerFormData)
         btnSync = view.findViewById(R.id.btnSync)
         btnDelete = view.findViewById(R.id.btnDelete)
-        btnBack = view.findViewById(R.id.btnBack)
+
+        // ============================================
+        // SETUP TOOLBAR
+        // ============================================
+
+        toolbar.setNavigationOnClickListener {
+            findNavController().popBackStack()
+        }
+
+        // ============================================
+        // SETUP BUTTONS
+        // ============================================
+
+        btnSync.setOnClickListener { syncSubmission() }
+        btnDelete.setOnClickListener { deleteSubmission() }
 
         // ============================================
         // LOAD SUBMISSION
         // ============================================
 
         loadSubmission()
-
-        // ============================================
-        // SETUP BUTTONS
-        // ============================================
-
-        btnSync.setOnClickListener {
-            Log.d("SubmissionDetailFragment", "⚡ Sync button clicked for #$submissionId")
-            com.jsac.sync.worker.SyncScheduler.scheduleSyncSingle(requireContext(), submissionId)
-            Toast.makeText(requireContext(), "Sync started…", Toast.LENGTH_SHORT).show()
-            // No need to manually refresh — loadSubmission() already collects a Room
-            // Flow, so the status badge updates on its own once the worker finishes.
-        }
-
-        btnDelete.setOnClickListener {
-            Log.d("SubmissionDetailFragment", "🗑️ Delete button clicked")
-            deleteSubmission()
-        }
-
-        btnBack.setOnClickListener {
-            Log.d("SubmissionDetailFragment", "⬅️ Back button clicked")
-            findNavController().popBackStack()
-        }
     }
 
     // ============================================
@@ -133,7 +120,7 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
     // ============================================
 
     private fun loadSubmission() {
-        Log.d("SubmissionDetailFragment", "📥 Loading submission $submissionId")
+        Log.d("SubmissionDetailFragment", "Loading submission $submissionId")
 
         showLoading()
 
@@ -143,21 +130,17 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
                     if (submissionEntity != null) {
                         submission = submissionEntity
                         displaySubmission(submissionEntity)
-
-                        // ✅ NEW: Display media files
-
-
                         hideLoading()
                     } else {
-                        Log.e("SubmissionDetailFragment", "❌ Submission not found: $submissionId")
-                        showError("Submission not found", null)
+                        Log.e("SubmissionDetailFragment", "Submission not found: $submissionId")
+                        showError("Submission not found")
                         hideLoading()
                     }
                 }
 
             } catch (e: Exception) {
-                Log.e("SubmissionDetailFragment", "❌ Error loading: ${e.message}", e)
-                showError("Failed to load submission: ${e.message}", e)
+                Log.e("SubmissionDetailFragment", "Error loading submission: ${e.message}", e)
+                showError("Failed to load submission")
                 hideLoading()
             }
         }
@@ -168,54 +151,57 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
     // ============================================
 
     private fun displaySubmission(submission: FormSubmissionEntity) {
-        Log.d("SubmissionDetailFragment", "📋 Displaying submission")
+        Log.d("SubmissionDetailFragment", "Displaying submission")
 
         // ============================================
         // FORM METADATA
         // ============================================
 
-        // ✅ ENHANCED: Get actual form name instead of just ID
-        tvFormName.text = "📋 Form: ${submission.form_id}"
-
-        tvFormId.text = "Submission ID: #${submission.id}"
-
-        val createdDate = formatDate(submission.created_at)
-        tvCreatedAt.text = "📅 Created: $createdDate"
+        tvFormName.text = submission.form_id
+        tvFormId.text = getString(R.string.label_submission_number, submission.id)
+        tvCreatedAt.text = dateFormat.format(Date(submission.created_at))
 
         // ============================================
         // SYNC STATUS
         // ============================================
 
-        val (statusBadge, statusColor) = when (submission.sync_status) {
-            "PENDING" -> "⏳ Pending (Not yet synced)" to Color.parseColor("#FFC107")
-            "SYNCING" -> "🔄 Syncing..." to Color.parseColor("#2196F3")
-            "SYNCED" -> "✅ Synced" to Color.parseColor("#4CAF50")
-            "FAILED" -> "❌ Failed" to Color.parseColor("#F44336")
-            else -> submission.sync_status to Color.GRAY
-        }
-        tvSyncStatus.text = "Status: $statusBadge"
-        tvSyncStatus.setTextColor(statusColor)
+        bindStatus(submission)
+        updateSyncButton(submission)
 
-        // Synced date
+        // ============================================
+        // SYNCED DATE
+        // ============================================
+
         if (submission.synced_at != null) {
-            val syncedDate = formatDate(submission.synced_at!!)
-            tvSyncedAt.text = "✅ Synced: $syncedDate"
+            tvSyncedAt.text = getString(
+                R.string.label_synced_date,
+                dateFormat.format(Date(submission.synced_at!!))
+            )
             tvSyncedAt.visibility = View.VISIBLE
         } else {
             tvSyncedAt.visibility = View.GONE
         }
 
-        // Retry count
+        // ============================================
+        // RETRY COUNT
+        // ============================================
+
         if (submission.retry_count > 0) {
-            tvRetryCount.text = "🔁 Retry count: ${submission.retry_count}"
+            tvRetryCount.text = getString(
+                R.string.label_retries,
+                submission.retry_count
+            )
             tvRetryCount.visibility = View.VISIBLE
         } else {
             tvRetryCount.visibility = View.GONE
         }
 
-        // Error message
-        if (submission.error_message != null && submission.error_message!!.isNotEmpty()) {
-            tvErrorMessage.text = "⚠️ Error: ${submission.error_message}"
+        // ============================================
+        // ERROR MESSAGE
+        // ============================================
+
+        if (!submission.error_message.isNullOrEmpty()) {
+            tvErrorMessage.text = submission.error_message
             tvErrorMessage.visibility = View.VISIBLE
         } else {
             tvErrorMessage.visibility = View.GONE
@@ -226,13 +212,45 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
         // ============================================
 
         displayFormData(submission.form_data)
+    }
 
-        // ============================================
-        // UPDATE BUTTON STATES
-        // ============================================
+    // ============================================
+    // BIND STATUS CHIP
+    // ============================================
 
-        btnSync.isEnabled = submission.sync_status != "SYNCED"
-        btnSync.text = if (submission.sync_status == "SYNCED") "✅ Already Synced" else "🔄 Sync Now"
+    private fun bindStatus(submission: FormSubmissionEntity) {
+        val statusInfo = SubmissionStatusUi.of(submission.sync_status)
+
+        chipStatus.text = statusInfo.label
+        chipStatus.chipBackgroundColor = ContextCompat.getColorStateList(
+            requireContext(),
+            statusInfo.backgroundColorRes
+        )
+        chipStatus.setTextColor(
+            ContextCompat.getColor(requireContext(), statusInfo.foregroundColorRes)
+        )
+    }
+
+    // ============================================
+    // UPDATE SYNC BUTTON STATE
+    // ============================================
+
+    private fun updateSyncButton(submission: FormSubmissionEntity) {
+        val synced = SubmissionStatusUi.isSynced(submission.sync_status)
+
+        btnSync.isEnabled = !synced
+        btnSync.alpha = if (synced) 0.6f else 1f
+        btnSync.text = if (synced) {
+            getString(R.string.status_synced)
+        } else {
+            getString(R.string.btn_sync_now)
+        }
+
+        btnSync.icon = if (synced) {
+            null
+        } else {
+            ContextCompat.getDrawable(requireContext(), R.drawable.ic_sync)
+        }
     }
 
     // ============================================
@@ -240,7 +258,7 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
     // ============================================
 
     private fun displayFormData(formDataJson: String) {
-        Log.d("SubmissionDetailFragment", "📊 Displaying form data")
+        Log.d("SubmissionDetailFragment", "Displaying form data")
 
         containerFormData.removeAllViews()
 
@@ -250,145 +268,117 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
 
             if (formData.isEmpty()) {
                 val tvEmpty = TextView(requireContext()).apply {
-                    text = "No form data"
-                    textSize = 14f
+                    text = getString(R.string.msg_no_form_data)
+                    setTextAppearance(R.style.TextAppearance_Sync_BodySmall)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply {
-                        setMargins(0, 16, 0, 0)
+                        topMargin = requireContext().resources.getDimensionPixelSize(R.dimen.space_md)
                     }
                 }
                 containerFormData.addView(tvEmpty)
                 return
             }
 
-            // Add header
-            val tvHeader = TextView(requireContext()).apply {
-                text = "📝 Form Fields"
-                textSize = 16f
-                setTypeface(null, Typeface.BOLD)
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    bottomMargin = 12
-                }
-            }
-            containerFormData.addView(tvHeader)
-
             for ((key, value) in formData) {
-                // Field container
-                val fieldContainer = LinearLayout(requireContext()).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        setMargins(0, 12, 0, 0)
-                    }
-                    orientation = LinearLayout.VERTICAL
-                    background = android.graphics.drawable.ColorDrawable(
-                        Color.parseColor("#F5F5F5")
-                    )
-                    setPadding(12, 12, 12, 12)
-                }
-
-                // Field label
-                val tvLabel = TextView(requireContext()).apply {
-                    text = key.toString()
-                    textSize = 12f
-                    setTextColor(Color.parseColor("#666666"))
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        setMargins(0, 0, 0, 4)
-                    }
-                    typeface = Typeface.defaultFromStyle(Typeface.BOLD)
-                }
-                fieldContainer.addView(tvLabel)
-
-                // Field value
-                val tvValue = TextView(requireContext()).apply {
-                    text = value.toString()
-                    textSize = 14f
-                    setTextColor(Color.parseColor("#000000"))
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
-                }
-                fieldContainer.addView(tvValue)
-
-                containerFormData.addView(fieldContainer)
+                containerFormData.addView(
+                    createFormFieldView(key.toString(), value.toString())
+                )
             }
 
         } catch (e: Exception) {
             Log.e("SubmissionDetailFragment", "Error parsing form data: ${e.message}")
-            showError("Error parsing form data", e)
+            showError("Error parsing form data")
         }
     }
 
     // ============================================
-    // ✅ NEW: DISPLAY MEDIA FILES
+    // CREATE FORM FIELD VIEW
     // ============================================
 
+    private fun createFormFieldView(fieldName: String, fieldValue: String): View {
+        val fieldContainer = LinearLayout(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = requireContext().resources.getDimensionPixelSize(R.dimen.space_sm)
+            }
+            orientation = LinearLayout.VERTICAL
+            background = ContextCompat.getDrawable(
+                requireContext(),
+                R.drawable.bg_form_field_container
+            ) ?: android.graphics.drawable.ColorDrawable(
+                ContextCompat.getColor(requireContext(), R.color.md_surface_variant)
+            )
+            setPadding(
+                requireContext().resources.getDimensionPixelSize(R.dimen.space_md),
+                requireContext().resources.getDimensionPixelSize(R.dimen.space_md),
+                requireContext().resources.getDimensionPixelSize(R.dimen.space_md),
+                requireContext().resources.getDimensionPixelSize(R.dimen.space_md)
+            )
+        }
 
+        // Field label
+        val tvLabel = TextView(requireContext()).apply {
+            text = fieldName
+            setTextAppearance(R.style.TextAppearance_Sync_BodySmall)
+            setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = requireContext().resources.getDimensionPixelSize(R.dimen.space_xs)
+            }
+        }
+        fieldContainer.addView(tvLabel)
 
-    // ============================================
-    // ✅ NEW: CREATE MEDIA ITEM VIEW
-    // ============================================
+        // Field value
+        val tvValue = TextView(requireContext()).apply {
+            text = fieldValue
+            setTextAppearance(R.style.TextAppearance_Sync_Body)
+            setTextColor(ContextCompat.getColor(requireContext(), R.color.text_primary))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        fieldContainer.addView(tvValue)
 
-
+        return fieldContainer
+    }
 
     // ============================================
     // SYNC SUBMISSION
     // ============================================
 
+    private fun syncSubmission() {
+        Log.d("SubmissionDetailFragment", "Sync requested for #$submissionId")
 
+        com.jsac.sync.worker.SyncScheduler.scheduleSyncSingle(requireContext(), submissionId)
+        showToast("Sync started")
+    }
 
     // ============================================
     // DELETE SUBMISSION
     // ============================================
 
     private fun deleteSubmission() {
-        Log.d("SubmissionDetailFragment", "🗑️ Deleting submission $submissionId")
+        Log.d("SubmissionDetailFragment", "Delete requested for #$submissionId")
 
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 repository.deleteSubmission(submissionId)
-                Log.d("SubmissionDetailFragment", "✅ Submission deleted successfully")
-                Toast.makeText(
-                    requireContext(),
-                    "Submission deleted",
-                    Toast.LENGTH_SHORT
-                ).show()
-
+                Log.d("SubmissionDetailFragment", "Submission deleted successfully")
+                showToast("Submission deleted")
                 findNavController().popBackStack()
 
             } catch (e: Exception) {
-                Log.e("SubmissionDetailFragment", "❌ Delete error: ${e.message}", e)
-                showError("Delete failed: ${e.message}", e)
+                Log.e("SubmissionDetailFragment", "Delete error: ${e.message}", e)
+                showError("Delete failed: ${e.message}")
             }
         }
-    }
-
-    // ============================================
-    // ✅ NEW: IMPROVED ERROR HANDLING
-    // ============================================
-
-    private fun showError(message: String, throwable: Throwable? = null) {
-        Log.e("SubmissionDetailFragment", "Error: $message", throwable)
-
-        Toast.makeText(
-            requireContext(),
-            "❌ $message",
-            Toast.LENGTH_LONG
-        ).show()
-
-        // Show in UI
-        tvErrorMessage.text = "❌ Error: $message"
-        tvErrorMessage.visibility = View.VISIBLE
     }
 
     // ============================================
@@ -396,24 +386,29 @@ class SubmissionDetailFragment : Fragment(R.layout.fragment_submission_detail) {
     // ============================================
 
     private fun showLoading() {
-        progressBar.visibility = View.VISIBLE
+        loadingContainer.visibility = View.VISIBLE
         scrollView.visibility = View.GONE
     }
 
     private fun hideLoading() {
-        progressBar.visibility = View.GONE
+        loadingContainer.visibility = View.GONE
         scrollView.visibility = View.VISIBLE
     }
 
     // ============================================
-    // HELPER FUNCTIONS
+    // ERROR & TOAST HELPERS
     // ============================================
 
-    private fun formatDate(timeMillis: Long): String {
-        val dateFormat = java.text.SimpleDateFormat(
-            "MMM dd, yyyy HH:mm:ss",
-            java.util.Locale.getDefault()
-        )
-        return dateFormat.format(java.util.Date(timeMillis))
+    private fun showError(message: String) {
+        Log.e("SubmissionDetailFragment", "Error: $message")
+
+        tvErrorMessage.text = message
+        tvErrorMessage.visibility = View.VISIBLE
+
+        showToast(message)
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
 }

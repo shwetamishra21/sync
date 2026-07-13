@@ -1,8 +1,6 @@
 package com.jsac.sync.presentation.splash
 
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.View
 import androidx.fragment.app.Fragment
@@ -25,20 +23,20 @@ class SplashFragment : Fragment(R.layout.fragment_splash) {
     ) {
         super.onViewCreated(view, savedInstanceState)
 
-        Log.d("SplashFragment", "🚀 Splash screen shown")
+        Log.d("SplashFragment", "Splash screen displayed")
 
         lifecycleScope.launch {
             viewModel.isLoggedIn.collect { isLoggedIn ->
 
-                Log.d("SplashFragment", "📊 isLoggedIn: $isLoggedIn")
+                Log.d("SplashFragment", "Session state: $isLoggedIn")
 
                 // ← IMPORTANT: Only proceed if we haven't navigated yet
                 if (hasNavigated) {
-                    Log.d("SplashFragment", "⏭️ Already navigated, skipping...")
+                    Log.d("SplashFragment", "Navigation already completed")
                     return@collect
                 }
 
-                Handler(Looper.getMainLooper()).postDelayed({
+                view.postDelayed({
 
                     // Double-check we haven't navigated
                     if (hasNavigated) {
@@ -48,7 +46,7 @@ class SplashFragment : Fragment(R.layout.fragment_splash) {
                     try {
                         if (isLoggedIn) {
 
-                            Log.d("SplashFragment", "✅ User logged in - Navigate to Home")
+                            Log.d("SplashFragment", "Navigating to Home")
                             hasNavigated = true  // ← Set flag BEFORE navigating
 
                             findNavController().navigate(
@@ -57,7 +55,7 @@ class SplashFragment : Fragment(R.layout.fragment_splash) {
 
                         } else {
 
-                            Log.d("SplashFragment", "❌ User not logged in - Navigate to Login")
+                            Log.d("SplashFragment", "Navigating to Login")
                             hasNavigated = true  // ← Set flag BEFORE navigating
 
                             findNavController().navigate(
@@ -65,10 +63,10 @@ class SplashFragment : Fragment(R.layout.fragment_splash) {
                             )
                         }
                     } catch (e: Exception) {
-                        Log.e("SplashFragment", "❌ Navigation error: ${e.message}", e)
+                        Log.e("SplashFragment", "Navigation failed: ${e.message}", e)
                     }
 
-                }, 2000)
+                }, 1500)
             }
         }
     }
