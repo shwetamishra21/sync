@@ -11,23 +11,36 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import type { ThemeConfig } from "../../../types/form";
+import { asPlainObject } from "../../../utils/normalizeConfig";
 
 interface Props {
   theme: ThemeConfig;
   onSave: (theme: ThemeConfig) => Promise<void>;
 }
 
+const DEFAULT_THEME: ThemeConfig = {
+  primaryColor: "#1976d2",
+  secondaryColor: "#dc004e",
+  backgroundColor: "#ffffff",
+  surfaceColor: "#f5f5f5",
+  buttonColor: "#1976d2",
+  buttonTextColor: "#ffffff",
+  textColor: "#000000",
+  cornerRadius: 4,
+};
+
 export default function ThemeEditor({
   theme,
   onSave,
 }: Props) {
-  const [editableTheme, setEditableTheme] =
-    useState<ThemeConfig>(theme);
+  const [editableTheme, setEditableTheme] = useState<ThemeConfig>(
+    asPlainObject(theme, DEFAULT_THEME)
+  );
 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setEditableTheme(theme);
+    setEditableTheme(asPlainObject(theme, DEFAULT_THEME));
   }, [theme]);
 
   const handleColorChange = useCallback(
@@ -68,7 +81,7 @@ export default function ThemeEditor({
   );
 
   const handleReset = useCallback(() => {
-    setEditableTheme(theme);
+    setEditableTheme(asPlainObject(theme, DEFAULT_THEME));
   }, [theme]);
 
   return (

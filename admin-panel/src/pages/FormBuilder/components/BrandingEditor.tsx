@@ -12,23 +12,32 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import type { BrandingConfig } from "../../../types/form";
+import { asPlainObject } from "../../../utils/normalizeConfig";
 
 interface Props {
   branding: BrandingConfig;
   onSave: (branding: BrandingConfig) => Promise<void>;
 }
 
+const DEFAULT_BRANDING: BrandingConfig = {
+  logo: "",
+  banner: "",
+  organizationName: "",
+  titleAlignment: "left",
+};
+
 export default function BrandingEditor({
   branding,
   onSave,
 }: Props) {
-  const [editableBranding, setEditableBranding] =
-    useState<BrandingConfig>(branding);
+  const [editableBranding, setEditableBranding] = useState<BrandingConfig>(
+    asPlainObject(branding, DEFAULT_BRANDING)
+  );
 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setEditableBranding(branding);
+    setEditableBranding(asPlainObject(branding, DEFAULT_BRANDING));
   }, [branding]);
 
   const handleStringChange = useCallback(
@@ -56,7 +65,7 @@ export default function BrandingEditor({
   );
 
   const handleReset = useCallback(() => {
-    setEditableBranding(branding);
+    setEditableBranding(asPlainObject(branding, DEFAULT_BRANDING));
   }, [branding]);
 
   return (

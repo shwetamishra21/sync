@@ -15,23 +15,35 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import type { LayoutConfig } from "../../../types/form";
+import { asPlainObject } from "../../../utils/normalizeConfig";
 
 interface Props {
   layout: LayoutConfig;
   onSave: (layout: LayoutConfig) => Promise<void>;
 }
 
+const DEFAULT_LAYOUT: LayoutConfig = {
+  columns: 1,
+  spacing: 16,
+  fieldStyle: "outlined",
+  labelPosition: "top",
+  cardPadding: 24,
+  sectionSpacing: 32,
+  showDividers: true,
+};
+
 export default function LayoutEditor({
   layout,
   onSave,
 }: Props) {
-  const [editableLayout, setEditableLayout] =
-    useState<LayoutConfig>(layout);
+  const [editableLayout, setEditableLayout] = useState<LayoutConfig>(
+    asPlainObject(layout, DEFAULT_LAYOUT)
+  );
 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setEditableLayout(layout);
+    setEditableLayout(asPlainObject(layout, DEFAULT_LAYOUT));
   }, [layout]);
 
   const handleNumberChange = useCallback(
@@ -82,7 +94,7 @@ export default function LayoutEditor({
   );
 
   const handleReset = useCallback(() => {
-    setEditableLayout(layout);
+    setEditableLayout(asPlainObject(layout, DEFAULT_LAYOUT));
   }, [layout]);
 
   return (
