@@ -63,6 +63,10 @@ app.config["SECRET_KEY"] = "jsac_secret_key"
 # Store reset tokens (use database in production)
 otp_store = {}
 
+# ✅ NEW: Store pending registrations awaiting OTP verification
+# Format: { username: { "otp": "123456", "password": "<hashed>", "expires_at": datetime, "verified": False } }
+registration_otp_store = {}
+
 # ============================================
 # MIDDLEWARE - JWT AUTHENTICATION
 # ============================================
@@ -133,6 +137,18 @@ def health():
 
 @app.route("/register", methods=["POST"])
 def register():
+    """
+    ✅ UPDATED: Registration now goes through OTP verification,
+    reusing the same OTP generate/store/send pattern as forgot-password.
+
+    POST /register
+        -> validates input, generates OTP, emails it, holds the
+           hashed password in registration_otp_store (NOT yet in DB)
+        -> Returns: {"message": "OTP sent to your email"}
+
+    The actual User row is only created after the OTP is verified
+    via POST /verify-registration-otp.
+    """
     print("\n[AUTH] POST /register called")
     
     try:
@@ -161,23 +177,116 @@ def register():
             password
         ).decode("utf-8")
 
+        # Generate OTP (same helper pattern used by forgot-password)
+        otp = str(random.randint(100000, 999999))
+
+        registration_otp_store[username] = {
+            "otp": otp,
+            "password": hashed_password,
+            "expires_at": datetime.datetime.utcnow() + timedelta(minutes=10),
+            "verified": False
+        }
+
+        print(f"\n{'='*50}")
+        print(f"🔐 Registration OTP for {username}: {otp}")
+        print(f"{'='*50}\n")
+
+        send_otp_email(username, otp, purpose="register")
+
+        print(f"[AUTH] Registration OTP sent to {username}")
+
+        return {
+            "message": "OTP sent to your email"
+        }, 200
+    
+    except Exception as e:
+        print(f"[AUTH] Error in register: {str(e)}")
+        db.session.rollback()
+        return {"message": f"Error: {str(e)}"}, 500
+
+
+@app.route("/verify-registration-otp", methods=["POST"])
+def verify_registration_otp():
+    """
+    ✅ NEW: Verifies the OTP sent during /register and, only on
+    success, actually creates the User row in the database.
+
+    POST /verify-registration-otp
+    Request body:
+    {
+        "username": "user@example.com",
+        "otp": "123456"
+    }
+
+    Response:
+    {
+        "message": "Registration successful"
+    }
+    """
+    print("\n[AUTH] POST /verify-registration-otp called")
+
+    try:
+        data = request.get_json()
+
+        username = data.get("username")
+        otp = data.get("otp")
+
+        if not username or not otp:
+            print("[AUTH] Username and OTP are required")
+            return {
+                "message": "Username and OTP are required"
+            }, 400
+
+        if username not in registration_otp_store:
+            print(f"[AUTH] No pending registration found for {username}")
+            return {
+                "message": "OTP expired or registration not found. Please register again."
+            }, 400
+
+        record = registration_otp_store[username]
+
+        if datetime.datetime.utcnow() > record["expires_at"]:
+            del registration_otp_store[username]
+            print(f"[AUTH] Registration OTP expired for {username}")
+            return {
+                "message": "OTP expired. Please register again."
+            }, 400
+
+        if otp != record["otp"]:
+            print(f"[AUTH] Invalid registration OTP for {username}")
+            return {
+                "message": "Invalid OTP"
+            }, 400
+
+        # Guard against a duplicate registration completing in the meantime
+        existing_user = User.query.filter_by(username=username).first()
+
+        if existing_user:
+            del registration_otp_store[username]
+            print(f"[AUTH] User {username} already exists")
+            return {
+                "message": "User already exists"
+            }, 400
+
         new_user = User(
             username=username,
-            password=hashed_password
+            password=record["password"]
         )
 
         db.session.add(new_user)
         db.session.commit()
 
-        print(f"[AUTH] User {username} registered successfully")
-        
+        del registration_otp_store[username]
+
+        print(f"[AUTH] User {username} registered successfully after OTP verification")
+
         return {
             "message": "Registration successful"
         }, 201
-    
+
     except Exception as e:
-        print(f"[AUTH] Error in register: {str(e)}")
         db.session.rollback()
+        print(f"[AUTH] Error in verify_registration_otp: {str(e)}")
         return {"message": f"Error: {str(e)}"}, 500
 
 
@@ -294,17 +403,35 @@ def admin_login():
             "message": str(e)
         },500
 
-def send_otp_email(email, otp):
+def send_otp_email(email, otp, purpose="reset"):
+    """
+    ✅ UPDATED: Reused for both password-reset and registration OTP emails.
+
+    Args:
+        email: recipient email address
+        otp: 6-digit OTP code
+        purpose: "reset" (default) or "register"
+    """
+
+    subject = (
+        "JSAC Registration OTP" if purpose == "register"
+        else "JSAC Password Reset OTP"
+    )
+
+    action_text = (
+        "verify your registration" if purpose == "register"
+        else "reset your password"
+    )
 
     msg = Message(
-        subject="JSAC Password Reset OTP",
+        subject=subject,
         recipients=[email]
     )
 
     msg.body = f"""
 Hello,
 
-Your OTP for password reset is:
+Your OTP to {action_text} is:
 
 {otp}
 

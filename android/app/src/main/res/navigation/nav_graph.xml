@@ -57,6 +57,12 @@
         <action
             android:id="@+id/action_register_to_login"
             app:destination="@id/loginFragment"/>
+
+        <!-- ✅ NEW: Registration now requires OTP verification, reusing
+             the same otpVerificationFragment used by Forgot Password -->
+        <action
+            android:id="@+id/action_register_to_otpVerificationFragment"
+            app:destination="@id/otpVerificationFragment"/>
     </fragment>
 
     <!-- ============================================ -->
@@ -91,9 +97,23 @@
             android:name="username"
             app:argType="string"/>
 
+        <!-- ✅ NEW: Distinguishes which flow this screen is reused for:
+             "forgot_password" (default) or "register" -->
+        <argument
+            android:name="flow"
+            app:argType="string"
+            android:defaultValue="forgot_password"/>
+
         <action
             android:id="@+id/action_otpVerificationFragment_to_resetPasswordFragment"
             app:destination="@id/resetPasswordFragment"/>
+
+        <!-- ✅ NEW: Registration flow completes here -> go to Login -->
+        <action
+            android:id="@+id/action_otpVerificationFragment_to_login"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="true"/>
     </fragment>
 
     <!-- ============================================ -->

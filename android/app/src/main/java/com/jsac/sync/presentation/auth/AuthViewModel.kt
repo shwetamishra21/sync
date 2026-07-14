@@ -7,6 +7,7 @@ import com.jsac.sync.data.local.datastore.SessionManager
 import com.jsac.sync.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import javax.inject.Inject
 
 @HiltViewModel
@@ -46,9 +47,24 @@ class AuthViewModel @Inject constructor(
 
                     Log.d("AuthViewModel", "❌ Registration failed - Status: ${response.code()}")
 
-                    onResult(
+                    // ✅ FIXED: Surface the actual backend message (e.g.
+                    // "User already exists") instead of a generic failure
+                    // string, same error-parsing pattern used by
+                    // ForgotPasswordViewModel.
+                    val errorMessage = try {
+                        val errorBody = response.errorBody()?.string()
+                        if (!errorBody.isNullOrEmpty()) {
+                            val json = JSONObject(errorBody)
+                            json.optString("message", "Registration failed")
+                        } else {
+                            "Registration failed"
+                        }
+                    } catch (e: Exception) {
+                        Log.e("AuthViewModel", "Error parsing error response: ${e.message}")
                         "Registration failed"
-                    )
+                    }
+
+                    onResult(errorMessage)
                 }
 
             } catch (e: Exception) {

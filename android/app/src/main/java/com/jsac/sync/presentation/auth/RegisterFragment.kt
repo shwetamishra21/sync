@@ -69,10 +69,19 @@ class RegisterFragment : Fragment(R.layout.fragment_register) {
                     Toast.LENGTH_SHORT
                 ).show()
 
-                if (result.contains("successful", true)) {
+                // ✅ Backend now sends an OTP instead of creating the account
+                // right away. Reuse the same OtpVerificationFragment used by
+                // the forgot-password flow, tagged with flow = "register".
+                if (result.contains("OTP sent", true)) {
+
+                    val bundle = Bundle().apply {
+                        putString("username", username)
+                        putString("flow", "register")
+                    }
 
                     findNavController().navigate(
-                        R.id.action_register_to_login
+                        R.id.action_register_to_otpVerificationFragment,
+                        bundle
                     )
                 }
             }
