@@ -21,6 +21,98 @@ import mimetypes
 import traceback
 from sqlalchemy.exc import IntegrityError  # ✅ NEW: Import for duplicate handling
 
+def _is_char_indexed_dict(value):
+    """
+    Detects the "spread a string" corruption pattern.
+
+    Before the JSONB double-encoding bug was fixed, theme_json /
+    layout_json / branding_json could come back from the API as a JSON
+    STRING instead of an object. The Admin Panel editors (ThemeEditor /
+    LayoutEditor / BrandingEditor) kept that string in React state and, on
+    the next edit, did `{...prevString, [field]: newValue}`. Spreading a
+    JS string doesn't throw - it silently turns each character into a
+    numeric-key entry, e.g. {"0": "{", "1": "\"", "2": "c", ..., "spacing": 20}.
+    That object is valid JSON, so it no longer crashes Gson/the browser,
+    but it's garbage: the real config is gone, replaced by one field
+    plus a pile of single-character entries. This is why "layout doesn't
+    work" (silently) even after the object/string bug was fixed.
+    """
+    if not isinstance(value, dict) or not value:
+        return False
+    numeric_keys = [k for k in value if isinstance(k, str) and k.isdigit()]
+    # A real theme/layout/branding config has none or very few numeric
+    # keys. A corrupted one is *mostly* sequential numeric keys starting
+    # at 0.
+    if len(numeric_keys) < 5:
+        return False
+    indices = sorted(int(k) for k in numeric_keys)
+    return indices[0] == 0 and len(numeric_keys) >= len(value) - 3
+
+
+def _reconstruct_string_from_char_dict(value):
+    numeric_items = sorted(
+        ((int(k), v) for k, v in value.items() if isinstance(k, str) and k.isdigit()),
+        key=lambda pair: pair[0],
+    )
+    return "".join(str(v) for _, v in numeric_items)
+
+
+def _coerce_json_field(value, _depth=0):
+    """
+    Normalize a value coming from a request payload so it can be stored
+    directly in a JSONB column (theme_json / layout_json / branding_json).
+
+    JSONB columns already store/return native Python dict/list objects via
+    SQLAlchemy - they must NOT be pre-serialized with json.dumps(), or the
+    column ends up holding a JSON string instead of a JSON object. That
+    breaks every consumer that expects an object at that path, including
+    the Admin Panel's Theme Editor and the Android app's Gson models
+    (ThemeConfig / LayoutConfig / BrandingConfig).
+
+    - dict/list -> returned as-is, UNLESS it's the "char-indexed" corrupted
+                   shape described in _is_char_indexed_dict(), in which case
+                   it's reconstructed back into real JSON
+    - str       -> assumed to be a JSON-encoded string (possibly encoded
+                   more than once); decoded back into a dict/list so we
+                   never persist a raw string in the JSONB column
+    - anything else / invalid JSON -> falls back to {} so the column never
+      ends up in a broken state
+    """
+    if _depth > 5:
+        return {}
+
+    if isinstance(value, dict):
+        if _is_char_indexed_dict(value):
+            reconstructed_str = _reconstruct_string_from_char_dict(value)
+            base = _coerce_json_field(reconstructed_str, _depth + 1)
+            # Any non-numeric keys mixed into the mangled object are real
+            # field edits the user made (e.g. `{...prevString, spacing: 99}`
+            # sets a genuine "spacing" key alongside the character keys).
+            # Merge those on top so the user's latest edit isn't lost.
+            if isinstance(base, dict):
+                overrides = {
+                    k: v for k, v in value.items()
+                    if not (isinstance(k, str) and k.isdigit())
+                }
+                return {**base, **overrides}
+            return base
+        return value
+
+    if isinstance(value, list):
+        return value
+
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        if isinstance(decoded, (dict, list, str)):
+            return _coerce_json_field(decoded, _depth + 1)
+        return {}
+
+    return {}
+
+
 app = Flask(__name__)
 load_dotenv()
 print("MAIL_USERNAME =", os.getenv("MAIL_USERNAME"))
@@ -1084,12 +1176,31 @@ def update_form(current_user, form_id):
             form.is_active = data["is_active"]
         
         # Update UI configuration
+        #
+        # NOTE: theme_json / layout_json / branding_json are JSONB columns.
+        # SQLAlchemy + psycopg already handle Python dict <-> JSONB
+        # (de)serialization automatically. Calling json.dumps() here used to
+        # store a JSON-encoded STRING *inside* the JSONB column (i.e. the
+        # column ended up holding '"{\"primaryColor\": \"#fff\", ...}"'
+        # instead of the actual object). That corrupted value was then
+        # returned as-is by to_dict_with_fields(), which:
+        #   - broke the Admin Panel's Theme Editor on reload (it received a
+        #     string instead of a ThemeConfig object), and
+        #   - crashed the Android app with
+        #     "java.lang.IllegalStateException: Expected BEGIN_OBJECT but
+        #     was STRING ... path $.form.layout" because Gson could not
+        #     parse a JSON string into the LayoutConfig data class.
+        #
+        # Fix: store the parsed dict/object directly and let JSONB handle
+        # serialization. If a client sends a JSON-encoded string for one of
+        # these fields (legacy behavior), decode it back into an object
+        # instead of persisting the raw string.
         if "theme" in data:
-            form.theme_json = json.dumps(data["theme"]) if isinstance(data["theme"], dict) else data["theme"]
+            form.theme_json = _coerce_json_field(data["theme"])
         if "layout" in data:
-            form.layout_json = json.dumps(data["layout"]) if isinstance(data["layout"], dict) else data["layout"]
+            form.layout_json = _coerce_json_field(data["layout"])
         if "branding" in data:
-            form.branding_json = json.dumps(data["branding"]) if isinstance(data["branding"], dict) else data["branding"]
+            form.branding_json = _coerce_json_field(data["branding"])
         
         db.session.commit()
         
